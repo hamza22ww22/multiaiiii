@@ -84,14 +84,14 @@ const Index = () => {
       <section className="container pb-24">
         <div className="mx-auto grid max-w-4xl gap-4 md:grid-cols-3">
           {[
-            { icon: MessageSquare, title: "Unlimited chat", desc: "No login, no message caps." },
-            { icon: Code2, title: "Simple REST API", desc: "One POST endpoint, JSON in, JSON out." },
-            { icon: Globe, title: "24/7 backend", desc: "Always-on serverless infrastructure." },
-          ].map((f) => (
-            <div key={f.title} className="rounded-2xl border border-border bg-card p-6">
-              <f.icon className="mb-3 h-5 w-5 text-primary" />
-              <h3 className="mb-1 font-semibold">{f.title}</h3>
-              <p className="text-sm text-muted-foreground">{f.desc}</p>
+            { Icon: MessageSquare, title: "Unlimited chat", desc: "No login, no message caps." },
+            { Icon: Code2, title: "Simple REST API", desc: "One POST endpoint, JSON in, JSON out." },
+            { Icon: Globe, title: "24/7 backend", desc: "Always-on serverless infrastructure." },
+          ].map(({ Icon, title, desc }) => (
+            <div key={title} className="rounded-2xl border border-border bg-card p-6">
+              <Icon className="mb-3 h-5 w-5 text-primary" />
+              <h3 className="mb-1 font-semibold">{title}</h3>
+              <p className="text-sm text-muted-foreground">{desc}</p>
             </div>
           ))}
         </div>
