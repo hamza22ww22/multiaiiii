@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { forwardRef, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Loader2, Send, Sparkles } from "lucide-react";
@@ -24,7 +24,7 @@ async function mintDemoKey(): Promise<string> {
   return data.api_key;
 }
 
-const ChatBox = () => {
+const ChatBox = forwardRef<HTMLDivElement>((_, ref) => {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -65,7 +65,7 @@ const ChatBox = () => {
   };
 
   return (
-    <div className="flex h-[600px] flex-col rounded-2xl border border-border bg-card shadow-elegant">
+    <div ref={ref} className="flex h-[600px] flex-col rounded-2xl border border-border bg-card shadow-elegant">
       <div className="flex items-center gap-2 border-b border-border px-5 py-4">
         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-accent">
           <Sparkles className="h-4 w-4 text-primary-foreground" />
@@ -128,6 +128,7 @@ const ChatBox = () => {
       </div>
     </div>
   );
-};
+});
+ChatBox.displayName = "ChatBox";
 
 export default ChatBox;

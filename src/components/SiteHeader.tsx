@@ -1,10 +1,11 @@
+import { forwardRef } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Sparkles } from "lucide-react";
 
-const SiteHeader = () => {
+const SiteHeader = forwardRef<HTMLElement>((_, ref) => {
   const { pathname } = useLocation();
   return (
-    <header className="sticky top-0 z-40 w-full border-b border-border/60 bg-background/80 backdrop-blur-xl">
+    <header ref={ref} className="sticky top-0 z-40 w-full border-b border-border/60 bg-background/80 backdrop-blur-xl">
       <div className="container flex h-16 items-center justify-between">
         <Link to="/" className="flex items-center gap-2">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-accent">
@@ -33,6 +34,7 @@ const SiteHeader = () => {
       </div>
     </header>
   );
-};
+});
+SiteHeader.displayName = "SiteHeader";
 
 export default SiteHeader;
