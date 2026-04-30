@@ -49,13 +49,39 @@ const ChatBox = forwardRef<HTMLDivElement>((_, ref) => {
           "Content-Type": "application/json",
           "x-api-key": apiKey,
         },
-        body: JSON.stringify({ messages: next }),
+        body: JSON.stringify({ messages: next, stream: true }),
       });
-      const data = await res.json();
-      if (!res.ok || !data?.response) {
-        throw new Error(data?.error || "Request failed");
+      if (!res.ok || !res.body) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData?.error || `Request failed (${res.status})`);
       }
-      setMessages([...next, { role: "assistant", content: data.response }]);
+      // Append empty assistant msg, fill it as tokens arrive
+      setMessages([...next, { role: "assistant", content: "" }]);
+      const reader = res.body.getReader();
+      const dec = new TextDecoder();
+      let buf = "";
+      let full = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += dec.decode(value, { stream: true });
+        const lines = buf.split("\n");
+        buf = lines.pop() || "";
+        for (const line of lines) {
+          const t = line.trim();
+          if (!t.startsWith("data:")) continue;
+          const payload = t.slice(5).trim();
+          if (!payload || payload === "[DONE]") continue;
+          try {
+            const j = JSON.parse(payload);
+            const chunk = typeof j.content === "string" ? j.content : "";
+            if (chunk) {
+              full += chunk;
+              setMessages([...next, { role: "assistant", content: full }]);
+            }
+          } catch { /* ignore */ }
+        }
+      }
     } catch (e: any) {
       toast.error(e?.message || "Something went wrong");
       setMessages(messages); // rollback
