@@ -1,29 +1,20 @@
-"use client";
-
-import { useState, useEffect, useRef, CSSProperties } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import SiteHeader from "@/components/SiteHeader";
 import ChatBox from "@/components/ChatBox";
 import { Button } from "@/components/ui/button";
 import {
   ArrowRight, Code2, MessageSquare, Globe, Zap, Shield,
-  Sparkles, Rocket, Brain, Cpu, Infinity as InfinityIcon,
-  ArrowUpRight
+  Sparkles, Terminal, Cpu, Infinity as InfinityIcon, ArrowUpRight
 } from "lucide-react";
 import { Tilt } from "@/components/fx/Tilt";
 import { Reveal } from "@/components/fx/Reveal";
 import { Hero3D } from "@/components/fx/Hero3D";
-import { ParticleField } from "@/components/fx/ParticleField";
-import InteractiveGrid from "@/components/fx/InteractiveGrid";
-import { OrbitalSystem } from "@/components/fx/OrbitalSystem";
-
-const GRID_SVG_URL = "data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%239C92AC' fill-opacity='0.05'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E";
 
 const Index = () => {
   const [view, setView] = useState<"chat" | "iframe">("chat");
   const [mouse, setMouse] = useState({ x: 0, y: 0 });
-  const [scrollY, setScrollY] = useState(0);
-  const heroRef = useRef<HTMLElement>(null);
+  const heroRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const onMove = (e: MouseEvent) => {
@@ -31,107 +22,97 @@ const Index = () => {
       const r = heroRef.current.getBoundingClientRect();
       setMouse({ x: ((e.clientX - r.left) / r.width) * 100, y: ((e.clientY - r.top) / r.height) * 100 });
     };
-
-    const onScroll = () => setScrollY(window.scrollY);
-
     window.addEventListener("mousemove", onMove);
-    window.addEventListener("scroll", onScroll);
-    return () => {
-      window.removeEventListener("mousemove", onMove);
-      window.removeEventListener("scroll", onScroll);
-    };
+    return () => window.removeEventListener("mousemove", onMove);
   }, []);
-
-  const parallaxStyle: CSSProperties = {
-    transform: `translateY(${scrollY * 0.5}px)`,
-  };
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-background noise">
       <SiteHeader />
 
-      {/* HERO SECTION */}
-      <section ref={heroRef} className="relative h-screen">
-        <div className="absolute inset-0 bg-gradient-to-b from-black via-gray-900 to-black" />
-        <ParticleField />
-        <div className="absolute inset-0 opacity-20"><InteractiveGrid /></div>
-        <div className="absolute inset-0"><OrbitalSystem /></div>
+      {/* HERO */}
+      <section ref={heroRef} className="relative">
+        {/* Animated grid */}
+        <div className="absolute inset-0 grid-bg" />
+        {/* 3D backdrop */}
         <Hero3D />
-        
+        {/* Spotlight follows cursor */}
         <div
           className="pointer-events-none absolute inset-0 transition-opacity duration-500"
-          style={{ background: `radial-gradient(800px circle at ${mouse.x}% ${mouse.y}%, rgba(255,255,255,0.1), transparent 50%)` }}
+          style={{
+            background: `radial-gradient(600px circle at ${mouse.x}% ${mouse.y}%, hsl(0 0% 100% / 0.06), transparent 40%)`,
+          }}
         />
+        {/* Floating orbs */}
+        <div className="float pointer-events-none absolute left-[8%] top-32 h-72 w-72 rounded-full bg-white/[0.03] blur-3xl" />
+        <div className="float-slow pointer-events-none absolute right-[10%] top-60 h-96 w-96 rounded-full bg-white/[0.04] blur-3xl" />
 
-        <div 
-          className="float pointer-events-none absolute left-[8%] top-32 h-72 w-72 rounded-full bg-gradient-to-r from-cyan-500/10 to-purple-500/10 blur-3xl"
-          style={parallaxStyle}
-        />
-
-        <div className="container relative h-full flex items-center">
-          <div className="mx-auto max-w-6xl text-center">
-            <Reveal className="mb-8">
-              <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/[0.08] px-6 py-2.5 backdrop-blur-xl">
-                <span className="relative flex h-2 w-2">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-cyan-400 opacity-75" />
-                  <span className="relative inline-flex h-2 w-2 rounded-full bg-cyan-400" />
-                </span>
-                <span className="font-mono text-xs uppercase tracking-[0.3em]">
-                  Unofficial Community Edition · v5.1 · Live
-                </span>
-              </div>
-            </Reveal>
-
-            <h1 className="reveal-up font-display text-6xl font-bold leading-[0.9] tracking-tight md:text-8xl lg:text-9xl">
-              <span className="block bg-gradient-to-r from-cyan-400 via-white to-purple-400 bg-clip-text text-transparent animate-gradient-x">
-                The Future
+        <div className="container relative pb-20 pt-24 md:pt-32">
+          <div className="mx-auto max-w-4xl text-center">
+            {/* Badge */}
+            <div className="reveal-up mb-8 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-4 py-1.5 text-xs backdrop-blur-xl">
+              <span className="relative flex h-1.5 w-1.5">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white opacity-75" />
+                <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-white" />
               </span>
-              <span className="block mt-4 text-stroke">
-                of AI is <span className="text-white">Here</span>
+              <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+                v5.1 · Live · Streaming
+              </span>
+            </div>
+
+            <h1
+              className="reveal-up font-display text-5xl font-bold leading-[0.95] tracking-tight md:text-7xl lg:text-8xl"
+              style={{ animationDelay: "0.1s" }}
+            >
+              <span className="block gradient-text">The fastest way</span>
+              <span className="block">
+                to talk to <span className="text-stroke">GLM</span>
               </span>
             </h1>
 
-            <p className="reveal-up mx-auto mt-8 max-w-2xl text-balance text-lg leading-relaxed text-muted-foreground md:text-xl">
-              <span className="shimmer inline-block bg-gradient-to-r from-white via-cyan-100 to-white bg-clip-text text-transparent">
-                Experience GLM 5.1 like never before. 3D visuals, real-time streaming, 
-                and developer tools in one stunning interface.
-              </span>
+            <p
+              className="reveal-up mx-auto mt-7 max-w-2xl text-balance text-base leading-relaxed text-muted-foreground md:text-lg"
+              style={{ animationDelay: "0.2s" }}
+            >
+              A blazing-fast chatbot interface and a developer API.
+              No login. No limits. No nonsense. Generate a key in seconds and stream
+              GLM into your own apps.
             </p>
 
-            <div className="reveal-up mt-12 flex flex-wrap items-center justify-center gap-4">
+            <div
+              className="reveal-up mt-10 flex flex-wrap items-center justify-center gap-3"
+              style={{ animationDelay: "0.3s" }}
+            >
               <Link to="/docs">
-                <Button size="lg" className="group relative h-14 overflow-hidden rounded-full bg-gradient-to-r from-cyan-500 to-purple-500 px-8 text-lg font-semibold text-white shadow-2xl shadow-cyan-500/25 hover:shadow-cyan-500/40">
-                  <span className="relative z-10 flex items-center">
-                    <Rocket className="mr-3 h-5 w-5" />
-                    Launch Now
-                    <ArrowRight className="ml-3 h-5 w-5 transition-transform group-hover:translate-x-2" />
-                  </span>
+                <Button
+                  size="lg"
+                  className="group h-12 rounded-full bg-foreground px-7 text-background hover:bg-white/90"
+                >
+                  Get API Key
+                  <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
                 </Button>
               </Link>
-              
-              <Link to="/faq">
-                <Button size="lg" variant="outline" className="h-14 rounded-full border-2 border-white/20 bg-white/[0.05] px-8 backdrop-blur-xl hover:border-white/40 hover:bg-white/[0.1]">
-                  <Brain className="mr-3 h-5 w-5" />
-                  Learn More
-                </Button>
-              </Link>
+              <button
+                onClick={() => document.getElementById("chat-area")?.scrollIntoView({ behavior: "smooth" })}
+                className="link-underline h-12 rounded-full border border-white/10 bg-white/[0.03] px-7 text-sm font-medium backdrop-blur-xl transition-colors hover:bg-white/[0.06]"
+              >
+                Try it now ↓
+              </button>
             </div>
 
-            <Reveal delay={400} className="mt-20">
-              <Tilt max={8} scale={1.02} depth={30} className="rounded-3xl">
-                <div className="grid grid-cols-2 gap-px overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-white/[0.08] to-white/[0.02] md:grid-cols-4">
+            {/* Stats strip with 3D tilt */}
+            <Reveal delay={400} className="mt-16">
+              <Tilt max={6} scale={1.01} depth={20} className="rounded-2xl">
+                <div className="grid grid-cols-3 gap-px overflow-hidden rounded-2xl border border-white/10 bg-white/5">
                   {[
-                    { v: "∞", l: "Unlimited Tokens", icon: InfinityIcon },
-                    { v: "<50ms", l: "Response Time", icon: Zap },
-                    { v: "99.9%", l: "Uptime SLA", icon: Shield },
-                    { v: "128K", l: "Context Window", icon: Cpu },
+                    { v: "<1s", l: "Time to first token" },
+                    { v: "∞", l: "Messages per day" },
+                    { v: "24/7", l: "Uptime" },
                   ].map((s, i) => (
-                    <div key={i} className="relative bg-background/80 p-8 backdrop-blur-sm">
-                      <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/5 to-purple-500/5" />
-                      <div className="relative">
-                        <s.icon className="mb-4 h-8 w-8 text-cyan-400" />
-                        <div className="font-display text-4xl font-bold md:text-5xl">{s.v}</div>
-                        <div className="mt-2 font-mono text-xs uppercase tracking-widest text-muted-foreground">{s.l}</div>
+                    <div key={i} className="bg-background px-4 py-6">
+                      <div className="font-display text-3xl font-bold md:text-4xl">{s.v}</div>
+                      <div className="mt-1 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                        {s.l}
                       </div>
                     </div>
                   ))}
@@ -143,51 +124,55 @@ const Index = () => {
       </section>
 
       {/* MARQUEE */}
-      <section className="relative border-y border-white/5 bg-gradient-to-r from-cyan-500/5 via-purple-500/5 to-cyan-500/5 py-8">
+      <section className="relative border-y border-white/5 bg-white/[0.02] py-6">
         <div className="flex overflow-hidden">
-          <div className="marquee flex shrink-0 items-center gap-12 px-6 font-display text-2xl font-medium">
-            {["⚡ REAL-TIME STREAMING", "✦", "🎯 3D VISUALIZATION", "✦", "🚀 EDGE DEPLOYED", "✦", "🔐 ZERO LOGIN", "✦", "🌐 GLOBAL CDN", "✦", "💫 UNLIMITED API", "✦"].map((t, i) => (
-              <span key={i} className="whitespace-nowrap bg-gradient-to-r from-cyan-300 via-white to-purple-300 bg-clip-text text-transparent">{t}</span>
+          <div className="marquee flex shrink-0 items-center gap-12 px-6 font-display text-2xl font-medium text-muted-foreground md:text-3xl">
+            {[
+              "STREAMING", "★", "ZERO LOGIN", "★", "PUBLIC API", "★", "UNLIMITED",
+              "★", "OPEN ENDPOINT", "★", "MILLISECOND TTFB", "★",
+              "STREAMING", "★", "ZERO LOGIN", "★", "PUBLIC API", "★", "UNLIMITED",
+              "★", "OPEN ENDPOINT", "★", "MILLISECOND TTFB", "★",
+            ].map((t, i) => (
+              <span key={i} className="whitespace-nowrap">{t}</span>
             ))}
           </div>
         </div>
       </section>
 
-      {/* CHAT SECTION */}
-      <section className="container py-28">
-        <div className="mx-auto max-w-6xl">
-          <Reveal className="mb-12 flex flex-col items-center gap-6 text-center">
-            <span className="font-mono text-xs uppercase tracking-[0.3em] text-cyan-400">[ 01 ] · Live Demo</span>
-            <h2 className="font-display text-5xl font-bold tracking-tight md:text-6xl">
-              Talk to <span className="gradient-text">GLM 5.1</span>
+      {/* CHAT AREA */}
+      <section id="chat-area" className="container py-20 md:py-28">
+        <div className="mx-auto max-w-5xl">
+          <Reveal className="mb-10 flex flex-col items-center gap-4 text-center">
+            <span className="font-mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground">
+              [ 01 ] · Live Demo
+            </span>
+            <h2 className="font-display text-4xl font-bold tracking-tight md:text-5xl">
+              Talk now.
             </h2>
-            <p className="max-w-2xl text-lg text-muted-foreground">
-              Experience the power of real-time AI conversations with our enhanced 3D interface.
+            <p className="max-w-xl text-muted-foreground">
+              No signup wall. Use the native streaming UI or open the original site in an iframe.
             </p>
           </Reveal>
 
-          <div className="mb-8 flex justify-center">
-            <div className="inline-flex rounded-2xl border border-white/10 bg-white/[0.03] p-1.5 backdrop-blur-xl">
+          {/* Toggle */}
+          <div className="mb-6 flex justify-center">
+            <div className="inline-flex rounded-full border border-white/10 bg-white/[0.03] p-1 backdrop-blur-xl">
               {[
-                { id: "chat", icon: MessageSquare, label: "3D Chat" },
-                { id: "iframe", icon: Globe, label: "Original Site" },
+                { id: "chat", icon: MessageSquare, label: "Native chat" },
+                { id: "iframe", icon: Globe, label: "Original site" },
               ].map((o) => {
                 const Icon = o.icon;
                 const active = view === o.id;
                 return (
                   <button
                     key={o.id}
-                    onClick={() => setView(o.id as typeof view)}
-                    className={`relative flex items-center gap-3 rounded-xl px-6 py-3 text-sm font-medium transition-all duration-300 ${active ? "bg-gradient-to-r from-cyan-500/20 to-purple-500/20 text-white" : "text-muted-foreground hover:text-white"}`}
+                    onClick={() => setView(o.id as any)}
+                    className={`relative flex items-center gap-2 rounded-full px-5 py-2 text-sm font-medium transition-all duration-300 ${
+                      active ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground"
+                    }`}
                   >
-                    <Icon className="h-4 w-4" />
+                    <Icon className="h-3.5 w-3.5" />
                     {o.label}
-                    {active && (
-                      <span className="absolute -top-1 -right-1 flex h-3 w-3">
-                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-cyan-400 opacity-75" />
-                        <span className="relative inline-flex h-3 w-3 rounded-full bg-cyan-400" />
-                      </span>
-                    )}
                   </button>
                 );
               })}
@@ -195,19 +180,19 @@ const Index = () => {
           </div>
 
           <Reveal delay={150}>
-            <Tilt max={6} scale={1.01} depth={20} glare={true} className="rounded-3xl">
-              <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-white/[0.05] to-white/[0.01] shadow-2xl shadow-cyan-500/10">
+            <Tilt max={4} scale={1.005} depth={10} glare={false} className="rounded-3xl">
+              <div className="glow-ring overflow-hidden rounded-3xl border border-white/10 bg-card">
                 {view === "chat" ? (
                   <ChatBox />
                 ) : (
-                  <div className="relative">
-                    <iframe src="https://glmfivepointone.space-z.ai/" title="GLM 5.1" className="h-[600px] w-full bg-card" />
-                    <div className="absolute inset-0 pointer-events-none bg-gradient-to-t from-background/50 to-transparent" />
-                    <p className="border-t border-white/10 bg-card px-4 py-3 text-center text-sm text-muted-foreground">
-                      <span className="flex items-center justify-center gap-2">
-                        <span className="h-2 w-2 animate-pulse rounded-full bg-amber-400" />
-                        Unofficial Enhanced Interface · Same AI Backend
-                      </span>
+                  <div>
+                    <iframe
+                      src="https://glmfivepointone.space-z.ai/"
+                      title="GLM 5.1"
+                      className="h-[600px] w-full bg-card"
+                    />
+                    <p className="border-t border-white/10 bg-card px-4 py-2 text-center text-xs text-muted-foreground">
+                      If embedding is blocked, switch to Native chat — same backend.
                     </p>
                   </div>
                 )}
@@ -218,36 +203,53 @@ const Index = () => {
       </section>
 
       {/* FEATURES */}
-      <section className="container py-28">
-        <div className="mx-auto max-w-7xl">
-          <div className="mb-16 flex flex-col items-center gap-6 text-center">
-            <span className="font-mono text-xs uppercase tracking-[0.3em] text-purple-400">[ 02 ] · Features</span>
-            <h2 className="font-display text-5xl font-bold tracking-tight md:text-6xl">
-              Built for the <span className="text-stroke">Future</span>
+      <section className="container py-20 md:py-28">
+        <div className="mx-auto max-w-6xl">
+          <div className="mb-14 flex flex-col items-center gap-4 text-center">
+            <span className="font-mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground">
+              [ 02 ] · Built for speed
+            </span>
+            <h2 className="font-display text-4xl font-bold tracking-tight md:text-5xl">
+              Everything you need.
+              <br />
+              <span className="text-stroke">Nothing you don't.</span>
             </h2>
           </div>
 
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-5 md:grid-cols-3">
             {[
-              { Icon: Zap, title: "Lightning Fast", desc: "Sub-50ms response times with real-time streaming.", gradient: "from-cyan-500 to-blue-500" },
-              { Icon: Brain, title: "Advanced AI", desc: "GLM 5.1 with 128K context window.", gradient: "from-purple-500 to-pink-500" },
-              { Icon: Globe, title: "Global Edge", desc: "Deployed across 50+ edge locations.", gradient: "from-green-500 to-emerald-500" },
-              { Icon: Shield, title: "Enterprise Security", desc: "End-to-end encryption.", gradient: "from-amber-500 to-orange-500" },
-              { Icon: Code2, title: "Developer First", desc: "Comprehensive API and SDKs.", gradient: "from-red-500 to-rose-500" },
-              { Icon: Rocket, title: "Always Evolving", desc: "Weekly updates and improvements.", gradient: "from-indigo-500 to-violet-500" },
-            ].map(({ Icon, title, desc, gradient }, i) => (
+              { Icon: Zap, title: "Streaming first", desc: "Server-Sent Events deliver tokens the moment they're generated." },
+              { Icon: InfinityIcon, title: "Unlimited messages", desc: "No quotas. No throttling. No login required." },
+              { Icon: Code2, title: "REST in 1 line", desc: "One POST. JSON in, JSON or stream out." },
+              { Icon: Shield, title: "Key-based auth", desc: "Generate, copy, ship. Each key isolated and revocable." },
+              { Icon: Cpu, title: "Edge deployed", desc: "Serverless edge functions running 24/7 worldwide." },
+              { Icon: Terminal, title: "Multi-turn memory", desc: "Pass the messages array — full conversation context preserved." },
+            ].map(({ Icon, title, desc }, i) => (
               <Reveal key={i} delay={i * 80}>
-                <Tilt max={12} scale={1.03} depth={40} className="h-full rounded-3xl">
-                  <div className="group relative h-full overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-white/[0.05] to-white/[0.01] p-8 transition-all duration-500 hover:border-white/30">
-                    <div className={`absolute inset-0 bg-gradient-to-br ${gradient} opacity-0 transition-opacity duration-500 group-hover:opacity-10`} />
-                    <div className="relative mb-6">
-                      <div className={`relative inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br ${gradient} p-3`}>
-                        <Icon className="h-8 w-8 text-white" />
-                      </div>
+                <Tilt max={14} scale={1.03} depth={40} className="h-full rounded-2xl">
+                  <div className="group relative h-full overflow-hidden rounded-2xl border border-white/10 bg-card p-8">
+                    <div
+                      className="mb-5 inline-flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 bg-white/[0.03] transition-colors group-hover:border-white/30 group-hover:bg-white/10"
+                      style={{ transform: "translateZ(40px)" }}
+                    >
+                      <Icon className="h-5 w-5" />
                     </div>
-                    <h3 className="relative mb-3 font-display text-2xl font-semibold">{title}</h3>
-                    <p className="relative text-sm leading-relaxed text-muted-foreground">{desc}</p>
-                    <ArrowUpRight className="absolute right-6 top-6 h-5 w-5 text-white/20 transition-all group-hover:text-white/60" />
+                    <h3
+                      className="mb-2 font-display text-lg font-semibold tracking-tight"
+                      style={{ transform: "translateZ(30px)" }}
+                    >
+                      {title}
+                    </h3>
+                    <p
+                      className="text-sm leading-relaxed text-muted-foreground"
+                      style={{ transform: "translateZ(20px)" }}
+                    >
+                      {desc}
+                    </p>
+                    <ArrowUpRight
+                      className="absolute right-6 top-6 h-4 w-4 text-muted-foreground/40 transition-all group-hover:text-foreground"
+                      style={{ transform: "translateZ(50px)" }}
+                    />
                   </div>
                 </Tilt>
               </Reveal>
@@ -256,170 +258,108 @@ const Index = () => {
         </div>
       </section>
 
-      {/* CODE SECTION */}
-      <section className="container py-28">
-        <div className="mx-auto grid max-w-7xl items-center gap-16 md:grid-cols-2">
+      {/* CODE PREVIEW */}
+      <section className="container py-20 md:py-28">
+        <div className="mx-auto grid max-w-6xl items-center gap-12 md:grid-cols-2">
           <Reveal>
-            <span className="font-mono text-xs uppercase tracking-[0.3em] text-cyan-400">[ 03 ] · Developer</span>
-            <h2 className="mt-4 font-display text-5xl font-bold tracking-tight md:text-6xl">
-              Code in <span className="gradient-text">3D</span>
+            <span className="font-mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground">
+              [ 03 ] · Developer first
+            </span>
+            <h2 className="mt-4 font-display text-4xl font-bold tracking-tight md:text-5xl">
+              One endpoint.<br />Infinite possibilities.
             </h2>
-            <p className="mt-6 text-lg text-muted-foreground">
-              Our API is designed for developers who demand the best.
+            <p className="mt-5 text-muted-foreground">
+              No SDK to install. No tokens to refresh. Just one HTTP call to a public endpoint
+              that streams GLM 5.1 responses straight into your application.
             </p>
-            
-            <div className="mt-8 space-y-4">
-              {["TypeScript/JavaScript SDK", "Python, Go, Rust packages", "WebSocket & SSE support", "Automatic retry logic"].map((feature, i) => (
-                <div key={i} className="flex items-center gap-3">
-                  <div className="flex h-6 w-6 items-center justify-center rounded-full border border-white/20">
-                    <Sparkles className="h-3 w-3" />
-                  </div>
-                  <span className="text-sm">{feature}</span>
-                </div>
-              ))}
-            </div>
-            
-            <div className="mt-10 flex flex-wrap gap-4">
+            <div className="mt-8 flex flex-wrap gap-3">
               <Link to="/docs">
-                <Button size="lg" className="group rounded-full bg-gradient-to-r from-cyan-500 to-blue-500 px-8">
-                  View Documentation
+                <Button size="lg" className="group rounded-full bg-foreground text-background hover:bg-white/90">
+                  Read the docs
                   <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
                 </Button>
               </Link>
             </div>
+
+            <ul className="mt-10 space-y-3 text-sm">
+              {["No API key rotation", "CORS open from any origin", "JSON or SSE response", "Free forever for fair use"].map((t, i) => (
+                <li key={i} className="flex items-center gap-3 text-muted-foreground">
+                  <span className="flex h-5 w-5 items-center justify-center rounded-full border border-white/20">
+                    <Sparkles className="h-2.5 w-2.5" />
+                  </span>
+                  {t}
+                </li>
+              ))}
+            </ul>
           </Reveal>
 
           <Reveal delay={150}>
-            <Tilt max={10} scale={1.02} depth={35} className="rounded-3xl">
-              <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-white/[0.05] to-white/[0.01]">
-                <div className="absolute inset-0 opacity-50" style={{ backgroundImage: `url('${GRID_SVG_URL}')` }} />
-                
-                <div className="relative border-b border-white/10 bg-white/[0.02] px-6 py-4">
-                  <div className="flex items-center gap-2">
-                    <div className="flex gap-1.5">
-                      <span className="h-3 w-3 rounded-full bg-red-500" />
-                      <span className="h-3 w-3 rounded-full bg-amber-500" />
-                      <span className="h-3 w-3 rounded-full bg-green-500" />
-                    </div>
-                    <span className="ml-3 font-mono text-xs text-muted-foreground">chat-api.js</span>
-                  </div>
-                </div>
-                
-                <pre className="overflow-x-auto p-8 font-mono text-sm leading-relaxed">
-{`import { GLMClient } from '@glm/sdk';
+            <Tilt max={10} scale={1.02} depth={35} className="rounded-2xl">
+              <div className="glow-ring overflow-hidden rounded-2xl border border-white/10 bg-card">
+            <div className="flex items-center gap-2 border-b border-white/10 bg-white/[0.02] px-4 py-3">
+              <div className="flex gap-1.5">
+                <span className="h-2.5 w-2.5 rounded-full bg-white/20" />
+                <span className="h-2.5 w-2.5 rounded-full bg-white/20" />
+                <span className="h-2.5 w-2.5 rounded-full bg-white/20" />
+              </div>
+              <span className="ml-2 font-mono text-xs text-muted-foreground">terminal — chat.sh</span>
+            </div>
+            <pre className="overflow-x-auto p-6 font-mono text-xs leading-relaxed">
+{`$ curl -N https://api.glm5point1.app/chat \\
+    -H "x-api-key: glm_••••••••" \\
+    -d '{"message":"Write a haiku"}'
 
-const client = new GLMClient({
-  apiKey: 'glm_••••••••',
-  streaming: true,
-});
-
-const stream = await client.chat({
-  messages: [
-    { role: 'user', content: 'Hi!' }
-  ],
-  model: 'glm-5.1',
-});
-
-// Stream tokens 🚀
-for await (const chunk of stream) {
-  process.stdout.write(chunk.content);
-}`}<span className="blink ml-1 inline-block h-4 w-2 bg-cyan-400" />
-                </pre>
+`}<span className="text-muted-foreground">{`# streaming response →`}</span>{`
+data: {"content":"Silent code at dawn,"}
+data: {"content":"\\nGLM whispers in the cloud—"}
+data: {"content":"\\nTokens bloom like stars."}
+data: [DONE]`}<span className="blink" />
+            </pre>
               </div>
             </Tilt>
           </Reveal>
         </div>
       </section>
 
-      {/* FINAL CTA */}
-      <section className="relative py-32">
-        <div className="absolute inset-0"><ParticleField /></div>
-        
-        <div className="container relative">
-          <div className="mx-auto max-w-4xl text-center">
-            <Reveal>
-              <span className="font-mono text-xs uppercase tracking-[0.3em] text-white">Ready to Build?</span>
-              <h2 className="mt-6 font-display text-6xl font-bold tracking-tight md:text-7xl">
-                Start <span className="gradient-text">Building</span> Today
-              </h2>
-              <p className="mx-auto mt-6 max-w-2xl text-lg text-white/80">
-                Join thousands of developers building with GLM 5.1. No credit card required.
-              </p>
-            </Reveal>
-            
-            <Reveal delay={200} className="mt-10">
-              <div className="flex flex-wrap justify-center gap-4">
-                <Link to="/docs">
-                  <Button size="lg" className="group relative h-16 overflow-hidden rounded-full bg-gradient-to-r from-cyan-500 via-purple-500 to-pink-500 px-10 text-lg font-semibold text-white shadow-2xl shadow-cyan-500/30">
-                    <span className="relative z-10 flex items-center">
-                      <Rocket className="mr-3 h-6 w-6" />
-                      Get Started Free
-                      <ArrowRight className="ml-3 h-5 w-5 transition-transform group-hover:translate-x-2" />
-                    </span>
-                  </Button>
-                </Link>
-                
-                <Link to="/faq">
-                  <Button size="lg" variant="outline" className="h-16 rounded-full border-2 border-white/30 bg-white/[0.08] px-10 text-lg backdrop-blur-xl">
-                    <Brain className="mr-3 h-5 w-5" />
-                    Learn More
-                  </Button>
-                </Link>
-              </div>
-            </Reveal>
-            
-            <Reveal delay={400} className="mt-12">
-              <div className="inline-flex items-center gap-6 rounded-2xl border border-white/10 bg-white/[0.05] px-8 py-4 backdrop-blur-xl">
-                {[
-                  { value: "10K+", label: "Developers" },
-                  { value: "99.9%", label: "Uptime" },
-                  { value: "50ms", label: "Avg Latency" },
-                  { value: "∞", label: "Free Tier" },
-                ].map((stat, i) => (
-                  <div key={i} className="text-center">
-                    <div className="font-display text-2xl font-bold">{stat.value}</div>
-                    <div className="font-mono text-xs uppercase tracking-widest text-white/60">{stat.label}</div>
-                  </div>
-                ))}
-              </div>
-            </Reveal>
+      {/* CTA */}
+      <section className="container py-24 md:py-32">
+        <div className="relative mx-auto max-w-4xl overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-white/[0.06] to-white/[0.01] px-8 py-20 text-center">
+          <div className="grid-bg absolute inset-0 opacity-50" />
+          <div className="relative">
+            <h2 className="font-display text-5xl font-bold tracking-tight md:text-7xl">
+              Ready to <span className="gradient-text">build?</span>
+            </h2>
+            <p className="mx-auto mt-6 max-w-md text-muted-foreground">
+              Generate your key in 5 seconds. Free, public, instant.
+            </p>
+            <Link to="/docs" className="mt-10 inline-block">
+              <Button
+                size="lg"
+                className="group h-14 rounded-full bg-foreground px-8 text-base text-background hover:bg-white/90"
+              >
+                Generate API Key
+                <ArrowRight className="ml-2 h-5 w-5 transition-transform group-hover:translate-x-1" />
+              </Button>
+            </Link>
           </div>
         </div>
       </section>
 
       {/* FOOTER */}
-      <footer className="border-t border-white/5 bg-gradient-to-b from-black to-gray-900">
-        <div className="container py-12">
-          <div className="flex flex-col items-center justify-between gap-8 md:flex-row">
-            <div className="flex items-center gap-3">
-              <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-500 to-purple-500">
-                <span className="font-display text-lg font-bold text-white">G</span>
-                <span className="pulse-ring absolute inset-0 rounded-xl" />
-              </div>
-              <div>
-                <span className="font-display text-lg font-semibold">GLM 5.1</span>
-                <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground">Unofficial Community Edition</p>
-              </div>
+      <footer className="border-t border-white/5">
+        <div className="container flex flex-col items-center justify-between gap-4 py-8 md:flex-row">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-7 w-7 items-center justify-center rounded-md bg-foreground">
+              <span className="font-display text-xs font-bold text-background">G</span>
             </div>
-            
-            <div className="flex flex-wrap justify-center gap-8">
-              <a href="#" className="link-underline text-sm text-muted-foreground hover:text-white">Documentation</a>
-              <a href="#" className="link-underline text-sm text-muted-foreground hover:text-white">API Reference</a>
-              <Link to="/faq" className="link-underline text-sm text-muted-foreground hover:text-white">FAQ</Link>
-              <a href="#" className="link-underline text-sm text-muted-foreground hover:text-white">Discord</a>
-            </div>
-            
-            <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground">
-              © 2026 · Community Built · Not affiliated with official GLM
-            </p>
+            <span className="font-display text-sm font-medium">GLM 5.1</span>
+            <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+              · Always on
+            </span>
           </div>
-          
-          <div className="mt-8 rounded-xl border border-amber-500/20 bg-amber-500/5 p-4 text-center">
-            <p className="text-sm text-amber-300/80">
-              ⚠️ This is an unofficial community-built interface. For official GLM 5.1 support, 
-              please visit the original website.
-            </p>
-          </div>
+          <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+            © 2026 · Made for builders
+          </p>
         </div>
       </footer>
     </div>
