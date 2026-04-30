@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Loader2, Send, Sparkles } from "lucide-react";
 import { toast } from "sonner";
+import { useTilt } from "@/hooks/use-tilt";
 
 type Msg = { role: "user" | "assistant"; content: string };
 
@@ -23,6 +24,25 @@ async function mintDemoKey(): Promise<string> {
   localStorage.setItem("glm_demo_key", data.api_key);
   return data.api_key;
 }
+
+const Bubble = ({ m, isStreaming }: { m: Msg; isStreaming: boolean }) => {
+  const ref = useTilt<HTMLDivElement>({ max: 6, scale: 1.02, glare: false });
+  return (
+    <div className={`flex reveal-up ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+      <div
+        ref={ref}
+        className={`max-w-[80%] whitespace-pre-wrap rounded-2xl px-4 py-3 text-sm leading-relaxed shadow-lg shadow-black/20 ${
+          m.role === "user"
+            ? "bg-foreground text-background"
+            : "border border-white/10 bg-white/[0.04] text-foreground"
+        }`}
+      >
+        {m.content}
+        {isStreaming && <span className="blink" />}
+      </div>
+    </div>
+  );
+};
 
 const ChatBox = forwardRef<HTMLDivElement>((_, ref) => {
   const [messages, setMessages] = useState<Msg[]>([]);
@@ -134,18 +154,11 @@ const ChatBox = forwardRef<HTMLDivElement>((_, ref) => {
           </div>
         )}
         {messages.map((m, i) => (
-          <div key={i} className={`flex reveal-up ${m.role === "user" ? "justify-end" : "justify-start"}`}>
-            <div
-              className={`max-w-[80%] whitespace-pre-wrap rounded-2xl px-4 py-3 text-sm leading-relaxed ${
-                m.role === "user"
-                  ? "bg-foreground text-background"
-                  : "border border-white/10 bg-white/[0.04] text-foreground"
-              }`}
-            >
-              {m.content}
-              {m.role === "assistant" && i === messages.length - 1 && loading && <span className="blink" />}
-            </div>
-          </div>
+          <Bubble
+            key={i}
+            m={m}
+            isStreaming={m.role === "assistant" && i === messages.length - 1 && loading}
+          />
         ))}
         {loading && messages[messages.length - 1]?.role !== "assistant" && (
           <div className="flex justify-start">

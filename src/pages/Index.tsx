@@ -7,6 +7,9 @@ import {
   ArrowRight, Code2, MessageSquare, Globe, Zap, Shield,
   Sparkles, Terminal, Cpu, Infinity as InfinityIcon, ArrowUpRight
 } from "lucide-react";
+import { Tilt } from "@/components/fx/Tilt";
+import { Reveal } from "@/components/fx/Reveal";
+import { Hero3D } from "@/components/fx/Hero3D";
 
 const Index = () => {
   const [view, setView] = useState<"chat" | "iframe">("chat");
@@ -31,6 +34,8 @@ const Index = () => {
       <section ref={heroRef} className="relative">
         {/* Animated grid */}
         <div className="absolute inset-0 grid-bg" />
+        {/* 3D backdrop */}
+        <Hero3D />
         {/* Spotlight follows cursor */}
         <div
           className="pointer-events-none absolute inset-0 transition-opacity duration-500"
@@ -95,24 +100,25 @@ const Index = () => {
               </button>
             </div>
 
-            {/* Stats strip */}
-            <div
-              className="reveal-up mt-16 grid grid-cols-3 gap-px overflow-hidden rounded-2xl border border-white/10 bg-white/5"
-              style={{ animationDelay: "0.4s" }}
-            >
-              {[
-                { v: "<1s", l: "Time to first token" },
-                { v: "∞", l: "Messages per day" },
-                { v: "24/7", l: "Uptime" },
-              ].map((s, i) => (
-                <div key={i} className="bg-background px-4 py-6">
-                  <div className="font-display text-3xl font-bold md:text-4xl">{s.v}</div>
-                  <div className="mt-1 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-                    {s.l}
-                  </div>
+            {/* Stats strip with 3D tilt */}
+            <Reveal delay={400} className="mt-16">
+              <Tilt max={6} scale={1.01} depth={20} className="rounded-2xl">
+                <div className="grid grid-cols-3 gap-px overflow-hidden rounded-2xl border border-white/10 bg-white/5">
+                  {[
+                    { v: "<1s", l: "Time to first token" },
+                    { v: "∞", l: "Messages per day" },
+                    { v: "24/7", l: "Uptime" },
+                  ].map((s, i) => (
+                    <div key={i} className="bg-background px-4 py-6">
+                      <div className="font-display text-3xl font-bold md:text-4xl">{s.v}</div>
+                      <div className="mt-1 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                        {s.l}
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+              </Tilt>
+            </Reveal>
           </div>
         </div>
       </section>
@@ -136,7 +142,7 @@ const Index = () => {
       {/* CHAT AREA */}
       <section id="chat-area" className="container py-20 md:py-28">
         <div className="mx-auto max-w-5xl">
-          <div className="mb-10 flex flex-col items-center gap-4 text-center">
+          <Reveal className="mb-10 flex flex-col items-center gap-4 text-center">
             <span className="font-mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground">
               [ 01 ] · Live Demo
             </span>
@@ -146,7 +152,7 @@ const Index = () => {
             <p className="max-w-xl text-muted-foreground">
               No signup wall. Use the native streaming UI or open the original site in an iframe.
             </p>
-          </div>
+          </Reveal>
 
           {/* Toggle */}
           <div className="mb-6 flex justify-center">
@@ -173,22 +179,26 @@ const Index = () => {
             </div>
           </div>
 
-          <div className="glow-ring overflow-hidden rounded-3xl border border-white/10 bg-card">
-            {view === "chat" ? (
-              <ChatBox />
-            ) : (
-              <div>
-                <iframe
-                  src="https://glmfivepointone.space-z.ai/"
-                  title="GLM 5.1"
-                  className="h-[600px] w-full bg-card"
-                />
-                <p className="border-t border-white/10 bg-card px-4 py-2 text-center text-xs text-muted-foreground">
-                  If embedding is blocked, switch to Native chat — same backend.
-                </p>
+          <Reveal delay={150}>
+            <Tilt max={4} scale={1.005} depth={10} glare={false} className="rounded-3xl">
+              <div className="glow-ring overflow-hidden rounded-3xl border border-white/10 bg-card">
+                {view === "chat" ? (
+                  <ChatBox />
+                ) : (
+                  <div>
+                    <iframe
+                      src="https://glmfivepointone.space-z.ai/"
+                      title="GLM 5.1"
+                      className="h-[600px] w-full bg-card"
+                    />
+                    <p className="border-t border-white/10 bg-card px-4 py-2 text-center text-xs text-muted-foreground">
+                      If embedding is blocked, switch to Native chat — same backend.
+                    </p>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
+            </Tilt>
+          </Reveal>
         </div>
       </section>
 
@@ -206,7 +216,7 @@ const Index = () => {
             </h2>
           </div>
 
-          <div className="grid gap-px overflow-hidden rounded-3xl border border-white/10 bg-white/5 md:grid-cols-3">
+          <div className="grid gap-5 md:grid-cols-3">
             {[
               { Icon: Zap, title: "Streaming first", desc: "Server-Sent Events deliver tokens the moment they're generated." },
               { Icon: InfinityIcon, title: "Unlimited messages", desc: "No quotas. No throttling. No login required." },
@@ -215,17 +225,34 @@ const Index = () => {
               { Icon: Cpu, title: "Edge deployed", desc: "Serverless edge functions running 24/7 worldwide." },
               { Icon: Terminal, title: "Multi-turn memory", desc: "Pass the messages array — full conversation context preserved." },
             ].map(({ Icon, title, desc }, i) => (
-              <div
-                key={i}
-                className="hover-lift group relative bg-background p-8"
-              >
-                <div className="mb-5 inline-flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 bg-white/[0.03] transition-colors group-hover:border-white/30 group-hover:bg-white/10">
-                  <Icon className="h-5 w-5" />
-                </div>
-                <h3 className="mb-2 font-display text-lg font-semibold tracking-tight">{title}</h3>
-                <p className="text-sm leading-relaxed text-muted-foreground">{desc}</p>
-                <ArrowUpRight className="absolute right-6 top-6 h-4 w-4 text-muted-foreground/40 transition-all group-hover:right-5 group-hover:top-5 group-hover:text-foreground" />
-              </div>
+              <Reveal key={i} delay={i * 80}>
+                <Tilt max={14} scale={1.03} depth={40} className="h-full rounded-2xl">
+                  <div className="group relative h-full overflow-hidden rounded-2xl border border-white/10 bg-card p-8">
+                    <div
+                      className="mb-5 inline-flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 bg-white/[0.03] transition-colors group-hover:border-white/30 group-hover:bg-white/10"
+                      style={{ transform: "translateZ(40px)" }}
+                    >
+                      <Icon className="h-5 w-5" />
+                    </div>
+                    <h3
+                      className="mb-2 font-display text-lg font-semibold tracking-tight"
+                      style={{ transform: "translateZ(30px)" }}
+                    >
+                      {title}
+                    </h3>
+                    <p
+                      className="text-sm leading-relaxed text-muted-foreground"
+                      style={{ transform: "translateZ(20px)" }}
+                    >
+                      {desc}
+                    </p>
+                    <ArrowUpRight
+                      className="absolute right-6 top-6 h-4 w-4 text-muted-foreground/40 transition-all group-hover:text-foreground"
+                      style={{ transform: "translateZ(50px)" }}
+                    />
+                  </div>
+                </Tilt>
+              </Reveal>
             ))}
           </div>
         </div>
@@ -234,7 +261,7 @@ const Index = () => {
       {/* CODE PREVIEW */}
       <section className="container py-20 md:py-28">
         <div className="mx-auto grid max-w-6xl items-center gap-12 md:grid-cols-2">
-          <div>
+          <Reveal>
             <span className="font-mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground">
               [ 03 ] · Developer first
             </span>
@@ -264,9 +291,11 @@ const Index = () => {
                 </li>
               ))}
             </ul>
-          </div>
+          </Reveal>
 
-          <div className="glow-ring overflow-hidden rounded-2xl border border-white/10 bg-card">
+          <Reveal delay={150}>
+            <Tilt max={10} scale={1.02} depth={35} className="rounded-2xl">
+              <div className="glow-ring overflow-hidden rounded-2xl border border-white/10 bg-card">
             <div className="flex items-center gap-2 border-b border-white/10 bg-white/[0.02] px-4 py-3">
               <div className="flex gap-1.5">
                 <span className="h-2.5 w-2.5 rounded-full bg-white/20" />
@@ -286,7 +315,9 @@ data: {"content":"\\nGLM whispers in the cloud—"}
 data: {"content":"\\nTokens bloom like stars."}
 data: [DONE]`}<span className="blink" />
             </pre>
-          </div>
+              </div>
+            </Tilt>
+          </Reveal>
         </div>
       </section>
 
