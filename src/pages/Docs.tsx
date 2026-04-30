@@ -5,6 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Check, Copy, KeyRound, Loader2, Sparkles, Zap } from "lucide-react";
 import { toast } from "sonner";
+import { Tilt } from "@/components/fx/Tilt";
+import { Reveal } from "@/components/fx/Reveal";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
 const CHAT_ENDPOINT = `${SUPABASE_URL}/functions/v1/chat`;
@@ -102,7 +104,9 @@ with requests.post(
 
       <div className="container max-w-4xl py-16 space-y-10">
         {/* Generate key */}
-        <section className="reveal-up glow-ring rounded-3xl border border-white/10 bg-card p-8">
+        <Reveal>
+        <Tilt max={5} scale={1.005} depth={20} glare={false} className="rounded-3xl">
+        <section className="glow-ring rounded-3xl border border-white/10 bg-card p-8">
           <div className="mb-2 flex items-center gap-2">
             <KeyRound className="h-5 w-5" />
             <h2 className="font-display text-2xl font-semibold tracking-tight">Generate API key</h2>
@@ -146,9 +150,13 @@ with requests.post(
             </div>
           )}
         </section>
+        </Tilt>
+        </Reveal>
 
         {/* Endpoint */}
-        <section className="reveal-up rounded-3xl border border-white/10 bg-card p-8">
+        <Reveal delay={80}>
+        <Tilt max={4} scale={1.005} depth={15} glare={false} className="rounded-3xl">
+        <section className="rounded-3xl border border-white/10 bg-card p-8">
           <h2 className="mb-4 font-display text-2xl font-semibold tracking-tight">Endpoint</h2>
           <div className="flex items-center gap-2">
             <span className="rounded-md bg-foreground px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-widest text-background">
@@ -196,9 +204,13 @@ data: [DONE]`}</pre>
             </div>
           </div>
         </section>
+        </Tilt>
+        </Reveal>
 
         {/* Examples */}
-        <section className="reveal-up rounded-3xl border border-white/10 bg-card p-8">
+        <Reveal delay={160}>
+        <Tilt max={4} scale={1.005} depth={15} glare={false} className="rounded-3xl">
+        <section className="rounded-3xl border border-white/10 bg-card p-8">
           <h2 className="mb-5 font-display text-2xl font-semibold tracking-tight">Code examples</h2>
           <Tabs defaultValue="curl">
             <TabsList className="rounded-full border border-white/10 bg-white/[0.03] p-1">
@@ -227,6 +239,8 @@ data: [DONE]`}</pre>
             ))}
           </Tabs>
         </section>
+        </Tilt>
+        </Reveal>
 
         <p className="pt-4 text-center font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
           Backend running 24/7 · Powered by GLM 5.1 · Edge functions
