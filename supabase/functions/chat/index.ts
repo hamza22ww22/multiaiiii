@@ -85,9 +85,8 @@ Deno.serve(async (req) => {
 
   const totalLen = messages.reduce((acc, m) => acc + m.content.length, 0);
 
-  let success = true;
-  let errMsg: string | null = null;
-  let upstreamData: any = null;
+  // Decide mode: stream (default) or json (legacy)
+  const wantStream = body?.stream !== false;
 
   try {
     const upstreamRes = await fetch(UPSTREAM_URL, {
@@ -105,46 +104,100 @@ Deno.serve(async (req) => {
       }),
     });
 
-    const text = await upstreamRes.text();
-    try {
-      upstreamData = JSON.parse(text);
-    } catch {
-      upstreamData = { response: text };
+    if (!upstreamRes.ok || !upstreamRes.body) {
+      const errText = await upstreamRes.text().catch(() => "");
+      // Fire-and-forget log
+      supabase.from("api_usage").insert({
+        api_key_id: keyRow.id,
+        message_length: totalLen,
+        success: false,
+        error_message: `Upstream ${upstreamRes.status}`,
+      }).then(() => {});
+      return new Response(
+        JSON.stringify({ success: false, error: `Upstream ${upstreamRes.status}`, raw: errText }),
+        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
     }
 
-    if (!upstreamRes.ok) {
-      success = false;
-      errMsg = `Upstream ${upstreamRes.status}`;
+    if (wantStream) {
+      // Pipe the SSE stream straight back to the client - lightning fast TTFB.
+      // Log usage in background once stream finishes.
+      const [forClient, forLog] = upstreamRes.body.tee();
+
+      // Background: drain second branch to compute length, then log.
+      (async () => {
+        try {
+          const reader = forLog.getReader();
+          const dec = new TextDecoder();
+          let buf = "";
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buf += dec.decode(value, { stream: true });
+          }
+          await supabase.from("api_usage").insert({
+            api_key_id: keyRow.id,
+            message_length: totalLen,
+            success: true,
+            error_message: null,
+          });
+        } catch (_) { /* ignore */ }
+      })();
+
+      return new Response(forClient, {
+        status: 200,
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "text/event-stream; charset=utf-8",
+          "Cache-Control": "no-cache, no-transform",
+          "X-Accel-Buffering": "no",
+        },
+      });
     }
 
-    // Log usage (fire & forget but awaited so it doesn't get cancelled)
-    await supabase.from("api_usage").insert({
+    // Non-stream mode: aggregate SSE into single JSON response
+    const reader = upstreamRes.body.getReader();
+    const dec = new TextDecoder();
+    let buf = "";
+    let full = "";
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      const lines = buf.split("\n");
+      buf = lines.pop() || "";
+      for (const line of lines) {
+        const t = line.trim();
+        if (!t.startsWith("data:")) continue;
+        const payload = t.slice(5).trim();
+        if (!payload || payload === "[DONE]") continue;
+        try {
+          const j = JSON.parse(payload);
+          if (typeof j.content === "string") full += j.content;
+          else if (typeof j.response === "string") full += j.response;
+        } catch { /* ignore */ }
+      }
+    }
+
+    supabase.from("api_usage").insert({
       api_key_id: keyRow.id,
       message_length: totalLen,
-      success,
-      error_message: errMsg,
-    });
+      success: true,
+      error_message: null,
+    }).then(() => {});
 
     return new Response(
-      JSON.stringify({
-        success,
-        response: upstreamData?.response ?? null,
-        raw: upstreamData,
-      }),
-      {
-        status: success ? 200 : 502,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      },
+      JSON.stringify({ success: true, response: full }),
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (e) {
-    success = false;
-    errMsg = e instanceof Error ? e.message : "Unknown error";
-    await supabase.from("api_usage").insert({
+    const errMsg = e instanceof Error ? e.message : "Unknown error";
+    supabase.from("api_usage").insert({
       api_key_id: keyRow.id,
       message_length: totalLen,
       success: false,
       error_message: errMsg,
-    });
+    }).then(() => {});
     return new Response(JSON.stringify({ success: false, error: errMsg }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
