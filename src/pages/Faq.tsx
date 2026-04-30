@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import SiteHeader from "@/components/SiteHeader";
 import { Button } from "@/components/ui/button";
 import { ChevronDown, HelpCircle, Zap, Globe, Shield, Code2, Infinity as InfinityIcon, Sparkles } from "lucide-react";
