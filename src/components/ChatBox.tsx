@@ -91,48 +91,74 @@ const ChatBox = forwardRef<HTMLDivElement>((_, ref) => {
   };
 
   return (
-    <div ref={ref} className="flex h-[600px] flex-col rounded-2xl border border-border bg-card shadow-elegant">
-      <div className="flex items-center gap-2 border-b border-border px-5 py-4">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-accent">
-          <Sparkles className="h-4 w-4 text-primary-foreground" />
+    <div ref={ref} className="flex h-[600px] flex-col bg-card">
+      <div className="flex items-center justify-between border-b border-white/10 bg-white/[0.02] px-5 py-4">
+        <div className="flex items-center gap-3">
+          <div className="relative flex h-9 w-9 items-center justify-center rounded-xl bg-foreground">
+            <Sparkles className="h-4 w-4 text-background" />
+            <span className="pulse-ring absolute inset-0 rounded-xl" />
+          </div>
+          <div>
+            <p className="font-display text-sm font-semibold">GLM 5.1</p>
+            <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+              Streaming · Unlimited
+            </p>
+          </div>
         </div>
-        <div>
-          <p className="text-sm font-semibold">GLM 5.1</p>
-          <p className="text-xs text-muted-foreground">Unlimited chat · No login</p>
-        </div>
+        <span className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
+          <span className="relative flex h-1.5 w-1.5">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white opacity-75" />
+            <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-white" />
+          </span>
+          Online
+        </span>
       </div>
 
       <div ref={scrollRef} className="flex-1 space-y-4 overflow-y-auto px-5 py-6">
         {messages.length === 0 && (
-          <div className="flex h-full items-center justify-center">
-            <div className="text-center">
-              <p className="text-sm text-muted-foreground">Start a conversation with GLM 5.1</p>
+          <div className="flex h-full flex-col items-center justify-center gap-4">
+            <div className="font-display text-2xl font-semibold tracking-tight text-muted-foreground">
+              Ask me anything.
+            </div>
+            <div className="flex flex-wrap justify-center gap-2">
+              {["Write a haiku", "Explain quantum physics", "Plan my day", "Debug my code"].map((s) => (
+                <button
+                  key={s}
+                  onClick={() => setInput(s)}
+                  className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:border-white/30 hover:text-foreground"
+                >
+                  {s}
+                </button>
+              ))}
             </div>
           </div>
         )}
         {messages.map((m, i) => (
-          <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+          <div key={i} className={`flex reveal-up ${m.role === "user" ? "justify-end" : "justify-start"}`}>
             <div
               className={`max-w-[80%] whitespace-pre-wrap rounded-2xl px-4 py-3 text-sm leading-relaxed ${
                 m.role === "user"
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-secondary text-secondary-foreground"
+                  ? "bg-foreground text-background"
+                  : "border border-white/10 bg-white/[0.04] text-foreground"
               }`}
             >
               {m.content}
+              {m.role === "assistant" && i === messages.length - 1 && loading && <span className="blink" />}
             </div>
           </div>
         ))}
-        {loading && (
+        {loading && messages[messages.length - 1]?.role !== "assistant" && (
           <div className="flex justify-start">
-            <div className="rounded-2xl bg-secondary px-4 py-3 text-sm text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" />
+            <div className="flex items-center gap-1 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3">
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-white" />
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-white" style={{ animationDelay: "0.2s" }} />
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-white" style={{ animationDelay: "0.4s" }} />
             </div>
           </div>
         )}
       </div>
 
-      <div className="border-t border-border p-4">
+      <div className="border-t border-white/10 bg-white/[0.02] p-4">
         <div className="flex gap-2">
           <Textarea
             value={input}
@@ -144,13 +170,16 @@ const ChatBox = forwardRef<HTMLDivElement>((_, ref) => {
               }
             }}
             placeholder="Ask GLM anything..."
-            className="min-h-[48px] resize-none"
+            className="min-h-[48px] resize-none border-white/10 bg-white/[0.03] focus-visible:ring-white/30"
             disabled={loading}
           />
-          <Button onClick={send} disabled={loading || !input.trim()} size="icon" className="h-12 w-12 shrink-0">
+          <Button onClick={send} disabled={loading || !input.trim()} size="icon" className="h-12 w-12 shrink-0 rounded-xl bg-foreground text-background hover:bg-white/90">
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
           </Button>
         </div>
+        <p className="mt-2 text-center font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+          Press Enter to send · Shift + Enter for newline
+        </p>
       </div>
     </div>
   );

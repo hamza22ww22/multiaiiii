@@ -2,9 +2,8 @@ import { useState } from "react";
 import SiteHeader from "@/components/SiteHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Check, Copy, KeyRound, Loader2, Sparkles } from "lucide-react";
+import { Check, Copy, KeyRound, Loader2, Sparkles, Zap } from "lucide-react";
 import { toast } from "sonner";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
@@ -44,7 +43,7 @@ const Docs = () => {
 
   const exampleKey = apiKey || "YOUR_API_KEY";
 
-  const curl = `curl -X POST ${CHAT_ENDPOINT} \\
+  const curl = `curl -N -X POST ${CHAT_ENDPOINT} \\
   -H "Content-Type: application/json" \\
   -H "x-api-key: ${exampleKey}" \\
   -d '{"message":"Hello GLM!"}'`;
@@ -53,91 +52,124 @@ const Docs = () => {
   method: "POST",
   headers: {
     "Content-Type": "application/json",
-    "x-api-key": "${exampleKey}"
+    "x-api-key": "${exampleKey}",
   },
-  body: JSON.stringify({ message: "Hello GLM!" })
+  body: JSON.stringify({ message: "Hello GLM!" }),
 });
-const data = await res.json();
-console.log(data.response);`;
+
+// Stream tokens as they arrive
+const reader = res.body.getReader();
+const dec = new TextDecoder();
+while (true) {
+  const { done, value } = await reader.read();
+  if (done) break;
+  process.stdout.write(dec.decode(value));
+}`;
 
   const py = `import requests
 
-res = requests.post(
+with requests.post(
     "${CHAT_ENDPOINT}",
     headers={"x-api-key": "${exampleKey}"},
     json={"message": "Hello GLM!"},
-)
-print(res.json()["response"])`;
+    stream=True,
+) as r:
+    for line in r.iter_lines():
+        if line: print(line.decode())`;
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="relative min-h-screen bg-background noise">
       <SiteHeader />
 
-      <div className="container max-w-4xl py-12">
-        <div className="mb-10">
-          <h1 className="text-3xl font-bold md:text-4xl">API Documentation</h1>
-          <p className="mt-2 text-muted-foreground">
-            Generate a key, send messages, get answers. The backend is always on (24/7).
-          </p>
-        </div>
-
-        {/* Generate key */}
-        <Card className="mb-10 border-border bg-card p-6">
-          <div className="mb-4 flex items-center gap-2">
-            <KeyRound className="h-5 w-5 text-primary" />
-            <h2 className="text-lg font-semibold">Generate an API key</h2>
+      {/* Hero */}
+      <section className="relative border-b border-white/5">
+        <div className="absolute inset-0 grid-bg opacity-50" />
+        <div className="container relative py-20 md:py-28">
+          <div className="mx-auto max-w-3xl text-center">
+            <span className="font-mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground">
+              Documentation · v1
+            </span>
+            <h1 className="mt-4 font-display text-5xl font-bold tracking-tight md:text-7xl">
+              Build with <span className="gradient-text">GLM</span>
+            </h1>
+            <p className="mx-auto mt-5 max-w-xl text-muted-foreground">
+              One endpoint. Streaming responses. No login required.
+              Generate your API key below and start shipping.
+            </p>
           </div>
-          <p className="mb-4 text-sm text-muted-foreground">
-            No login required. Give it an optional label and click Generate.
+        </div>
+      </section>
+
+      <div className="container max-w-4xl py-16 space-y-10">
+        {/* Generate key */}
+        <section className="reveal-up glow-ring rounded-3xl border border-white/10 bg-card p-8">
+          <div className="mb-2 flex items-center gap-2">
+            <KeyRound className="h-5 w-5" />
+            <h2 className="font-display text-2xl font-semibold tracking-tight">Generate API key</h2>
+          </div>
+          <p className="mb-6 text-sm text-muted-foreground">
+            No login. No verification. Optional label, then click Generate.
           </p>
           <div className="flex flex-col gap-3 sm:flex-row">
             <Input
               placeholder="Optional label (e.g. 'my-app')"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="flex-1"
+              className="h-12 flex-1 rounded-xl border-white/10 bg-white/[0.03]"
             />
-            <Button onClick={generate} disabled={loading} className="glow">
+            <Button
+              onClick={generate}
+              disabled={loading}
+              className="h-12 rounded-xl bg-foreground px-6 text-background hover:bg-white/90"
+            >
               {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
               Generate Key
             </Button>
           </div>
 
           {apiKey && (
-            <div className="mt-5 rounded-lg border border-primary/40 bg-primary/5 p-4">
-              <p className="mb-2 text-xs font-medium uppercase tracking-wider text-primary">Your API key</p>
+            <div className="reveal-up mt-6 rounded-2xl border border-white/20 bg-white/[0.04] p-4">
+              <p className="mb-2 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                Your API key
+              </p>
               <div className="flex items-center gap-2">
-                <code className="flex-1 break-all rounded bg-background px-3 py-2 text-sm">{apiKey}</code>
-                <Button size="icon" variant="secondary" onClick={() => copy(apiKey, "key")}>
+                <code className="flex-1 break-all rounded-lg bg-background px-3 py-2.5 font-mono text-sm">
+                  {apiKey}
+                </code>
+                <Button size="icon" variant="secondary" className="rounded-lg" onClick={() => copy(apiKey, "key")}>
                   {copied === "key" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                 </Button>
               </div>
               <p className="mt-3 text-xs text-muted-foreground">
-                ⚠️ Save this somewhere safe — for security it cannot be retrieved later.
+                ⚠ Save this somewhere safe — for security it cannot be retrieved later.
               </p>
             </div>
           )}
-        </Card>
+        </section>
 
         {/* Endpoint */}
-        <Card className="mb-10 border-border bg-card p-6">
-          <h2 className="mb-2 text-lg font-semibold">Endpoint</h2>
+        <section className="reveal-up rounded-3xl border border-white/10 bg-card p-8">
+          <h2 className="mb-4 font-display text-2xl font-semibold tracking-tight">Endpoint</h2>
           <div className="flex items-center gap-2">
-            <span className="rounded bg-primary/20 px-2 py-1 text-xs font-bold text-primary">POST</span>
-            <code className="flex-1 break-all rounded bg-background px-3 py-2 text-sm">{CHAT_ENDPOINT}</code>
-            <Button size="icon" variant="secondary" onClick={() => copy(CHAT_ENDPOINT, "url")}>
+            <span className="rounded-md bg-foreground px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-widest text-background">
+              POST
+            </span>
+            <code className="flex-1 break-all rounded-lg bg-background px-3 py-2.5 font-mono text-sm">
+              {CHAT_ENDPOINT}
+            </code>
+            <Button size="icon" variant="secondary" className="rounded-lg" onClick={() => copy(CHAT_ENDPOINT, "url")}>
               {copied === "url" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
             </Button>
           </div>
 
-          <h3 className="mt-6 mb-2 text-sm font-semibold">Headers</h3>
-          <ul className="space-y-1 text-sm text-muted-foreground">
-            <li><code className="rounded bg-background px-2 py-0.5">Content-Type: application/json</code></li>
-            <li><code className="rounded bg-background px-2 py-0.5">x-api-key: YOUR_API_KEY</code></li>
+          <h3 className="mt-8 mb-3 font-mono text-xs uppercase tracking-widest text-muted-foreground">Headers</h3>
+          <ul className="space-y-2 text-sm">
+            <li><code className="rounded-md bg-background px-2.5 py-1 font-mono">Content-Type: application/json</code></li>
+            <li><code className="rounded-md bg-background px-2.5 py-1 font-mono">x-api-key: YOUR_API_KEY</code></li>
           </ul>
 
-          <h3 className="mt-6 mb-2 text-sm font-semibold">Request body</h3>
-          <pre className="overflow-x-auto rounded-lg bg-background p-4 text-xs">{`{
+          <h3 className="mt-8 mb-3 font-mono text-xs uppercase tracking-widest text-muted-foreground">Request body</h3>
+          <pre className="overflow-x-auto rounded-xl border border-white/5 bg-background p-5 font-mono text-xs leading-relaxed">{`{
   "message": "Hello GLM!"
 }
 
@@ -147,46 +179,45 @@ print(res.json()["response"])`;
     { "role": "user", "content": "Hi" },
     { "role": "assistant", "content": "Hello!" },
     { "role": "user", "content": "Tell me a joke" }
-  ]
+  ],
+  "stream": true
 }`}</pre>
 
-          <h3 className="mt-6 mb-2 text-sm font-semibold">Response</h3>
-          <pre className="overflow-x-auto rounded-lg bg-background p-4 text-xs">{`{
-  "success": true,
-  "response": "Hello! I'm GLM..."
-}`}</pre>
-
-          <h3 className="mt-6 mb-2 text-sm font-semibold">⚡ Streaming (default — lightning fast)</h3>
-          <p className="mb-2 text-sm text-muted-foreground">
-            Tokens are streamed back as Server-Sent Events for instant display.
-            Pass <code className="rounded bg-background px-1">{`"stream": false`}</code> in the body to get a single JSON response instead.
-          </p>
-          <pre className="overflow-x-auto rounded-lg bg-background p-4 text-xs">{`data: {"content":"Hello"}
+          <div className="mt-8 flex items-start gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+            <Zap className="mt-0.5 h-5 w-5 shrink-0" />
+            <div>
+              <h4 className="font-display text-sm font-semibold">Streaming (default)</h4>
+              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                Tokens stream as Server-Sent Events for instant feedback. Pass <code className="rounded bg-background px-1.5 py-0.5 font-mono">{`"stream": false`}</code> to receive a single JSON object.
+              </p>
+              <pre className="mt-3 overflow-x-auto rounded-lg bg-background p-3 font-mono text-[11px]">{`data: {"content":"Hello"}
 data: {"content":" world"}
 data: [DONE]`}</pre>
-        </Card>
+            </div>
+          </div>
+        </section>
 
         {/* Examples */}
-        <Card className="border-border bg-card p-6">
-          <h2 className="mb-4 text-lg font-semibold">Code examples</h2>
+        <section className="reveal-up rounded-3xl border border-white/10 bg-card p-8">
+          <h2 className="mb-5 font-display text-2xl font-semibold tracking-tight">Code examples</h2>
           <Tabs defaultValue="curl">
-            <TabsList>
-              <TabsTrigger value="curl">cURL</TabsTrigger>
-              <TabsTrigger value="js">JavaScript</TabsTrigger>
-              <TabsTrigger value="py">Python</TabsTrigger>
+            <TabsList className="rounded-full border border-white/10 bg-white/[0.03] p-1">
+              <TabsTrigger value="curl" className="rounded-full data-[state=active]:bg-foreground data-[state=active]:text-background">cURL</TabsTrigger>
+              <TabsTrigger value="js" className="rounded-full data-[state=active]:bg-foreground data-[state=active]:text-background">JavaScript</TabsTrigger>
+              <TabsTrigger value="py" className="rounded-full data-[state=active]:bg-foreground data-[state=active]:text-background">Python</TabsTrigger>
             </TabsList>
             {[
               { id: "curl", code: curl },
               { id: "js", code: js },
               { id: "py", code: py },
             ].map((ex) => (
-              <TabsContent key={ex.id} value={ex.id}>
+              <TabsContent key={ex.id} value={ex.id} className="mt-4">
                 <div className="relative">
-                  <pre className="overflow-x-auto rounded-lg bg-background p-4 text-xs">{ex.code}</pre>
+                  <pre className="overflow-x-auto rounded-xl border border-white/5 bg-background p-5 font-mono text-xs leading-relaxed">{ex.code}</pre>
                   <Button
                     size="icon"
                     variant="secondary"
-                    className="absolute right-2 top-2"
+                    className="absolute right-3 top-3 rounded-lg"
                     onClick={() => copy(ex.code, ex.id)}
                   >
                     {copied === ex.id ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
@@ -195,10 +226,10 @@ data: [DONE]`}</pre>
               </TabsContent>
             ))}
           </Tabs>
-        </Card>
+        </section>
 
-        <p className="mt-10 text-center text-sm text-muted-foreground">
-          Backend running 24/7 on serverless infrastructure · Powered by GLM 5.1
+        <p className="pt-4 text-center font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+          Backend running 24/7 · Powered by GLM 5.1 · Edge functions
         </p>
       </div>
     </div>
