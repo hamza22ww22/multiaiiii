@@ -155,6 +155,15 @@ print(res.json()["response"])`;
   "success": true,
   "response": "Hello! I'm GLM..."
 }`}</pre>
+
+          <h3 className="mt-6 mb-2 text-sm font-semibold">⚡ Streaming (default — lightning fast)</h3>
+          <p className="mb-2 text-sm text-muted-foreground">
+            Tokens are streamed back as Server-Sent Events for instant display.
+            Pass <code className="rounded bg-background px-1">{`"stream": false`}</code> in the body to get a single JSON response instead.
+          </p>
+          <pre className="overflow-x-auto rounded-lg bg-background p-4 text-xs">{`data: {"content":"Hello"}
+data: {"content":" world"}
+data: [DONE]`}</pre>
         </Card>
 
         {/* Examples */}
