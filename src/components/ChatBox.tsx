@@ -1,11 +1,12 @@
 import { forwardRef, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Send, Sparkles } from "lucide-react";
+import { Loader2, Send, Sparkles, Zap, Gauge, Timer } from "lucide-react";
 import { toast } from "sonner";
 import { useTilt } from "@/hooks/use-tilt";
 
-type Msg = { role: "user" | "assistant"; content: string };
+type Stats = { ttfb?: number; duration?: number; tokens?: number; tps?: number };
+type Msg = { role: "user" | "assistant"; content: string; stats?: Stats };
 
 const FUNCTIONS_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
 
@@ -29,16 +30,31 @@ const Bubble = ({ m, isStreaming }: { m: Msg; isStreaming: boolean }) => {
   const ref = useTilt<HTMLDivElement>({ max: 6, scale: 1.02, glare: false });
   return (
     <div className={`flex reveal-up ${m.role === "user" ? "justify-end" : "justify-start"}`}>
-      <div
-        ref={ref}
-        className={`max-w-[80%] whitespace-pre-wrap rounded-2xl px-4 py-3 text-sm leading-relaxed shadow-lg shadow-black/20 ${
-          m.role === "user"
-            ? "bg-foreground text-background"
-            : "border border-white/10 bg-white/[0.04] text-foreground"
-        }`}
-      >
-        {m.content}
-        {isStreaming && <span className="blink" />}
+      <div className="flex max-w-[80%] flex-col gap-1.5">
+        <div
+          ref={ref}
+          className={`whitespace-pre-wrap rounded-2xl px-4 py-3 text-sm leading-relaxed shadow-lg shadow-black/20 ${
+            m.role === "user"
+              ? "bg-foreground text-background"
+              : "border border-white/10 bg-white/[0.04] text-foreground"
+          }`}
+        >
+          {m.content}
+          {isStreaming && <span className="blink" />}
+        </div>
+        {m.role === "assistant" && m.stats && (
+          <div className="flex flex-wrap items-center gap-1.5 px-1 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+            <span className="flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.03] px-2 py-0.5">
+              <Timer className="h-2.5 w-2.5" /> TTFB {Math.round(m.stats.ttfb ?? 0)}ms
+            </span>
+            <span className="flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.03] px-2 py-0.5">
+              <Gauge className="h-2.5 w-2.5" /> {(m.stats.tps ?? 0).toFixed(1)} tok/s
+            </span>
+            <span className="flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.03] px-2 py-0.5">
+              <Zap className="h-2.5 w-2.5" /> {((m.stats.duration ?? 0) / 1000).toFixed(2)}s · {m.stats.tokens ?? 0} tok
+            </span>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -48,6 +64,7 @@ const ChatBox = forwardRef<HTMLDivElement>((_, ref) => {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [liveStats, setLiveStats] = useState<Stats | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -61,8 +78,10 @@ const ChatBox = forwardRef<HTMLDivElement>((_, ref) => {
     setMessages(next);
     setInput("");
     setLoading(true);
+    setLiveStats({ ttfb: undefined, duration: 0, tokens: 0, tps: 0 });
     try {
       const apiKey = await mintDemoKey();
+      const t0 = performance.now();
       const res = await fetch(FUNCTIONS_URL, {
         method: "POST",
         headers: {
@@ -76,17 +95,26 @@ const ChatBox = forwardRef<HTMLDivElement>((_, ref) => {
         throw new Error(errData?.error || `Request failed (${res.status})`);
       }
       // Append empty assistant msg, fill it as tokens arrive.
-      // Use rAF-batched flushes so React re-renders at most once per frame
-      // (keeps the UI buttery-smooth even on very long streams).
       setMessages([...next, { role: "assistant", content: "" }]);
       const reader = res.body.getReader();
       const dec = new TextDecoder();
       let buf = "";
       let full = "";
+      let tokenCount = 0;
+      let ttfb: number | undefined;
+      let firstByte = false;
       let pending = false;
       const flush = () => {
         pending = false;
-        setMessages([...next, { role: "assistant", content: full }]);
+        const dur = performance.now() - t0;
+        const tps = tokenCount > 0 && ttfb !== undefined
+          ? (tokenCount / Math.max(1, dur - ttfb)) * 1000
+          : 0;
+        setMessages([
+          ...next,
+          { role: "assistant", content: full, stats: { ttfb, duration: dur, tokens: tokenCount, tps } },
+        ]);
+        setLiveStats({ ttfb, duration: dur, tokens: tokenCount, tps });
       };
       const schedule = () => {
         if (pending) return;
@@ -96,6 +124,7 @@ const ChatBox = forwardRef<HTMLDivElement>((_, ref) => {
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
+        if (!firstByte) { firstByte = true; ttfb = performance.now() - t0; }
         buf += dec.decode(value, { stream: true });
         const lines = buf.split("\n");
         buf = lines.pop() || "";
@@ -109,13 +138,21 @@ const ChatBox = forwardRef<HTMLDivElement>((_, ref) => {
             const chunk = typeof j.content === "string" ? j.content : "";
             if (chunk) {
               full += chunk;
+              // Approx token count: ~4 chars/token heuristic, plus split fallback
+              tokenCount += Math.max(1, Math.ceil(chunk.length / 4));
               schedule();
             }
           } catch { /* ignore */ }
         }
       }
-      // Final flush to ensure last tokens are committed
-      setMessages([...next, { role: "assistant", content: full }]);
+      // Final flush to ensure last tokens + final stats are committed
+      const finalDur = performance.now() - t0;
+      const finalTps = tokenCount > 0 && ttfb !== undefined
+        ? (tokenCount / Math.max(1, finalDur - ttfb)) * 1000
+        : 0;
+      const finalStats: Stats = { ttfb, duration: finalDur, tokens: tokenCount, tps: finalTps };
+      setMessages([...next, { role: "assistant", content: full, stats: finalStats }]);
+      setLiveStats(finalStats);
     } catch (e: any) {
       toast.error(e?.message || "Something went wrong");
       setMessages(messages); // rollback
@@ -139,13 +176,27 @@ const ChatBox = forwardRef<HTMLDivElement>((_, ref) => {
             </p>
           </div>
         </div>
-        <span className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
-          <span className="relative flex h-1.5 w-1.5">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white opacity-75" />
-            <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-white" />
+        <div className="flex items-center gap-2">
+          {liveStats && (
+            <>
+              <span className="hidden sm:flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.04] px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                <Timer className="h-2.5 w-2.5" />
+                {liveStats.ttfb ? `${Math.round(liveStats.ttfb)}ms` : "..."}
+              </span>
+              <span className="hidden sm:flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.04] px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                <Gauge className="h-2.5 w-2.5" />
+                {(liveStats.tps ?? 0).toFixed(1)} t/s
+              </span>
+            </>
+          )}
+          <span className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
+            <span className="relative flex h-1.5 w-1.5">
+              <span className={`absolute inline-flex h-full w-full rounded-full bg-white opacity-75 ${loading ? "animate-ping" : ""}`} />
+              <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-white" />
+            </span>
+            {loading ? "Streaming" : "Online"}
           </span>
-          Online
-        </span>
+        </div>
       </div>
 
       <div ref={scrollRef} className="flex-1 space-y-4 overflow-y-auto px-5 py-6">
