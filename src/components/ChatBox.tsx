@@ -94,6 +94,12 @@ const ChatBox = forwardRef<HTMLDivElement>((_, ref) => {
         const errData = await res.json().catch(() => ({}));
         throw new Error(errData?.error || `Request failed (${res.status})`);
       }
+      // Upstream error returned as 200 + JSON (graceful fallback)
+      const ct = res.headers.get("content-type") || "";
+      if (ct.includes("application/json")) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData?.error || "Upstream error");
+      }
       // Append empty assistant msg, fill it as tokens arrive.
       setMessages([...next, { role: "assistant", content: "" }]);
       const reader = res.body.getReader();
