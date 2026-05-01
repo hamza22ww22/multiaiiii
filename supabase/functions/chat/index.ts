@@ -112,33 +112,67 @@ Deno.serve(async (req) => {
   const wantStream = body?.stream !== false;
 
   try {
-    const upstreamRes = await fetch(UPSTREAM_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Origin": "https://glmfivepointone.space-z.ai",
-        "Referer": "https://glmfivepointone.space-z.ai/",
-        "User-Agent": "Mozilla/5.0 (compatible; GLMProxy/1.0)",
-      },
-      body: JSON.stringify({
-        messages,
-        fileContent: body?.fileContent ?? null,
-        fileName: body?.fileName ?? null,
-      }),
+    // Retry upstream on 5xx / network errors with exponential backoff.
+    const upstreamBody = JSON.stringify({
+      messages,
+      fileContent: body?.fileContent ?? null,
+      fileName: body?.fileName ?? null,
     });
+    const doFetch = () =>
+      fetch(UPSTREAM_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Origin": "https://glmfivepointone.space-z.ai",
+          "Referer": "https://glmfivepointone.space-z.ai/",
+          "User-Agent": "Mozilla/5.0 (compatible; GLMProxy/1.0)",
+        },
+        body: upstreamBody,
+      });
 
-    if (!upstreamRes.ok || !upstreamRes.body) {
-      const errText = await upstreamRes.text().catch(() => "");
+    let upstreamRes: Response | null = null;
+    let lastErr = "";
+    const MAX_ATTEMPTS = 3;
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+      try {
+        upstreamRes = await doFetch();
+        if (upstreamRes.ok && upstreamRes.body) break;
+        // Retry only 5xx / 429
+        if (upstreamRes.status >= 500 || upstreamRes.status === 429) {
+          lastErr = `Upstream ${upstreamRes.status}`;
+          try { await upstreamRes.body?.cancel(); } catch { /* ignore */ }
+          if (attempt < MAX_ATTEMPTS) {
+            await new Promise((r) => setTimeout(r, 250 * attempt * attempt));
+            continue;
+          }
+        }
+        break; // non-retryable status
+      } catch (e) {
+        lastErr = e instanceof Error ? e.message : "network error";
+        if (attempt < MAX_ATTEMPTS) {
+          await new Promise((r) => setTimeout(r, 250 * attempt * attempt));
+          continue;
+        }
+      }
+    }
+
+    if (!upstreamRes || !upstreamRes.ok || !upstreamRes.body) {
+      const status = upstreamRes?.status ?? 502;
+      const errText = upstreamRes ? await upstreamRes.text().catch(() => "") : lastErr;
       // Fire-and-forget log
       getSb().from("api_usage").insert({
         api_key_id: keyRow.id,
         message_length: totalLen,
         success: false,
-        error_message: `Upstream ${upstreamRes.status}`,
+        error_message: `Upstream ${status}`,
       }).then(() => {});
+      const friendly =
+        status === 502 || status === 503 || status === 504
+          ? "The AI provider is temporarily overloaded. Please try again in a few seconds. (Tip: very large prompts are more likely to fail — try a shorter message.)"
+          : `Upstream error ${status}`;
       return new Response(
-        JSON.stringify({ success: false, error: `Upstream ${upstreamRes.status}`, raw: errText }),
-        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        JSON.stringify({ success: false, error: friendly, status, raw: errText?.slice(0, 500) }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
