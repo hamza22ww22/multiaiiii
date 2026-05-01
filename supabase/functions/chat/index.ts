@@ -11,6 +11,11 @@ const UPSTREAM_URL = "https://glmfivepointone.space-z.ai/api/chat";
 
 type ChatMessage = { role: "user" | "assistant" | "system"; content: string };
 
+// In-memory cache for API keys (per edge worker instance) — eliminates the
+// Postgres round-trip on every chat request. Entries live for 5 minutes.
+const KEY_CACHE = new Map<string, { id: string; active: boolean; exp: number }>();
+const KEY_TTL_MS = 5 * 60 * 1000;
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -22,10 +27,6 @@ Deno.serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
-
-  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  const supabase = createClient(supabaseUrl, serviceKey);
 
   // Extract API key from header (preferred) or body
   let apiKey =
@@ -52,14 +53,36 @@ Deno.serve(async (req) => {
     );
   }
 
-  // Validate key
-  const { data: keyRow, error: keyErr } = await supabase
-    .from("api_keys")
-    .select("id, active")
-    .eq("key", apiKey)
-    .maybeSingle();
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-  if (keyErr || !keyRow || !keyRow.active) {
+  // Lazy supabase client (only created if we need it)
+  let supabase: ReturnType<typeof createClient> | null = null;
+  const getSb = () => (supabase ??= createClient(supabaseUrl, serviceKey));
+
+  // Validate key — use in-memory cache when possible
+  let keyRow: { id: string; active: boolean } | null = null;
+  const cached = KEY_CACHE.get(apiKey);
+  const now = Date.now();
+  if (cached && cached.exp > now) {
+    keyRow = { id: cached.id, active: cached.active };
+  } else {
+    const { data, error } = await getSb()
+      .from("api_keys")
+      .select("id, active")
+      .eq("key", apiKey)
+      .maybeSingle();
+    if (error || !data) {
+      return new Response(JSON.stringify({ error: "Invalid or inactive API key" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    keyRow = data as { id: string; active: boolean };
+    KEY_CACHE.set(apiKey, { id: keyRow.id, active: keyRow.active, exp: now + KEY_TTL_MS });
+  }
+
+  if (!keyRow.active) {
     return new Response(JSON.stringify({ error: "Invalid or inactive API key" }), {
       status: 401,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -107,7 +130,7 @@ Deno.serve(async (req) => {
     if (!upstreamRes.ok || !upstreamRes.body) {
       const errText = await upstreamRes.text().catch(() => "");
       // Fire-and-forget log
-      supabase.from("api_usage").insert({
+      getSb().from("api_usage").insert({
         api_key_id: keyRow.id,
         message_length: totalLen,
         success: false,
@@ -120,37 +143,25 @@ Deno.serve(async (req) => {
     }
 
     if (wantStream) {
-      // Pipe the SSE stream straight back to the client - lightning fast TTFB.
-      // Log usage in background once stream finishes.
-      const [forClient, forLog] = upstreamRes.body.tee();
+      // Pipe upstream straight to client — no tee, no extra reader, no extra
+      // buffering. Fastest possible TTFB. Log usage immediately in background.
+      queueMicrotask(() => {
+        getSb().from("api_usage").insert({
+          api_key_id: keyRow!.id,
+          message_length: totalLen,
+          success: true,
+          error_message: null,
+        }).then(() => {});
+      });
 
-      // Background: drain second branch to compute length, then log.
-      (async () => {
-        try {
-          const reader = forLog.getReader();
-          const dec = new TextDecoder();
-          let buf = "";
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            buf += dec.decode(value, { stream: true });
-          }
-          await supabase.from("api_usage").insert({
-            api_key_id: keyRow.id,
-            message_length: totalLen,
-            success: true,
-            error_message: null,
-          });
-        } catch (_) { /* ignore */ }
-      })();
-
-      return new Response(forClient, {
+      return new Response(upstreamRes.body, {
         status: 200,
         headers: {
           ...corsHeaders,
           "Content-Type": "text/event-stream; charset=utf-8",
           "Cache-Control": "no-cache, no-transform",
           "X-Accel-Buffering": "no",
+          "Connection": "keep-alive",
         },
       });
     }
@@ -179,7 +190,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    supabase.from("api_usage").insert({
+    getSb().from("api_usage").insert({
       api_key_id: keyRow.id,
       message_length: totalLen,
       success: true,
@@ -192,7 +203,7 @@ Deno.serve(async (req) => {
     );
   } catch (e) {
     const errMsg = e instanceof Error ? e.message : "Unknown error";
-    supabase.from("api_usage").insert({
+    getSb().from("api_usage").insert({
       api_key_id: keyRow.id,
       message_length: totalLen,
       success: false,
