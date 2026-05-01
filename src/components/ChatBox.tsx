@@ -75,12 +75,24 @@ const ChatBox = forwardRef<HTMLDivElement>((_, ref) => {
         const errData = await res.json().catch(() => ({}));
         throw new Error(errData?.error || `Request failed (${res.status})`);
       }
-      // Append empty assistant msg, fill it as tokens arrive
+      // Append empty assistant msg, fill it as tokens arrive.
+      // Use rAF-batched flushes so React re-renders at most once per frame
+      // (keeps the UI buttery-smooth even on very long streams).
       setMessages([...next, { role: "assistant", content: "" }]);
       const reader = res.body.getReader();
       const dec = new TextDecoder();
       let buf = "";
       let full = "";
+      let pending = false;
+      const flush = () => {
+        pending = false;
+        setMessages([...next, { role: "assistant", content: full }]);
+      };
+      const schedule = () => {
+        if (pending) return;
+        pending = true;
+        requestAnimationFrame(flush);
+      };
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
@@ -97,11 +109,13 @@ const ChatBox = forwardRef<HTMLDivElement>((_, ref) => {
             const chunk = typeof j.content === "string" ? j.content : "";
             if (chunk) {
               full += chunk;
-              setMessages([...next, { role: "assistant", content: full }]);
+              schedule();
             }
           } catch { /* ignore */ }
         }
       }
+      // Final flush to ensure last tokens are committed
+      setMessages([...next, { role: "assistant", content: full }]);
     } catch (e: any) {
       toast.error(e?.message || "Something went wrong");
       setMessages(messages); // rollback
