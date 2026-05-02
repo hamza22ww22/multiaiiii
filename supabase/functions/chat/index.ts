@@ -7,39 +7,58 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-// DuckDuckGo AI Chat (unofficial) — VQD handshake + SSE
-const DDG_STATUS_URL = "https://duckduckgo.com/duckchat/v1/status";
-const DDG_CHAT_URL = "https://duckduckgo.com/duckchat/v1/chat";
-const DDG_MODEL = "gpt-4o-mini"; // also valid: "claude-3-haiku-20240307", "o3-mini",
-                                 // "meta-llama/Llama-3.3-70B-Instruct-Turbo",
-                                 // "mistralai/Mistral-Small-24B-Instruct-2501"
-const UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 " +
-           "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
-const COMMON_DDG_HEADERS = {
+// deep-seek.ai (unofficial) — Laravel app, SSE streaming, OpenRouter-style payloads.
+const DS_BASE = "https://deep-seek.ai";
+const DS_CHAT_PAGE = `${DS_BASE}/chat`;
+const DS_API_URL = `${DS_BASE}/api/chat`;
+const DS_DEFAULT_MODEL = "deepseek/deepseek-chat-v3.1";
+// Allowed: deepseek/deepseek-chat-v3.1 (V3), deepseek/deepseek-r1 (R1),
+//          deepseek/deepseek-v3.2 (marketed as V4)
+const UA =
+  "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 " +
+  "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
+const DS_COMMON_HEADERS = {
   "User-Agent": UA,
-  "Accept": "text/event-stream",
   "Accept-Language": "en-US,en;q=0.9",
-  "Origin": "https://duckduckgo.com",
-  "Referer": "https://duckduckgo.com/",
-  "Sec-Fetch-Dest": "empty",
-  "Sec-Fetch-Mode": "cors",
-  "Sec-Fetch-Site": "same-origin",
+  "Origin": DS_BASE,
+  "Referer": `${DS_BASE}/chat`,
 };
 
 type ChatMessage = { role: "user" | "assistant" | "system"; content: string };
 
-async function fetchVqd(): Promise<string> {
-  const res = await fetch(DDG_STATUS_URL, {
-    method: "GET",
-    headers: { ...COMMON_DDG_HEADERS, "x-vqd-accept": "1" },
-  });
-  // body must be consumed
-  try { await res.text(); } catch { /* ignore */ }
-  const vqd = res.headers.get("x-vqd-4") || res.headers.get("x-vqd-hash-1") || "";
-  if (!vqd) {
-    throw new Error(`DuckDuckGo VQD handshake failed (${res.status}). Provider may be blocking server IPs.`);
+// Per-worker session cache: CSRF token + cookie jar. Re-used across requests
+// for ~50 minutes (Laravel sessions live 2h, we refresh early to be safe).
+type DsSession = { csrf: string; cookie: string; exp: number };
+let DS_SESSION: DsSession | null = null;
+const DS_SESSION_TTL_MS = 50 * 60 * 1000;
+
+function pickCookies(setCookieHeaders: string[]): string {
+  // Build a minimal "Cookie:" string from Set-Cookie headers (XSRF-TOKEN + deepseek_session).
+  const map = new Map<string, string>();
+  for (const sc of setCookieHeaders) {
+    const seg = sc.split(";")[0].trim();
+    const eq = seg.indexOf("=");
+    if (eq > 0) map.set(seg.slice(0, eq), seg.slice(eq + 1));
   }
-  return vqd;
+  return [...map.entries()].map(([k, v]) => `${k}=${v}`).join("; ");
+}
+
+async function getSession(force = false): Promise<DsSession> {
+  const now = Date.now();
+  if (!force && DS_SESSION && DS_SESSION.exp > now) return DS_SESSION;
+  const res = await fetch(DS_CHAT_PAGE, {
+    method: "GET",
+    headers: { ...DS_COMMON_HEADERS, "Accept": "text/html" },
+  });
+  const html = await res.text();
+  const m = html.match(/csrf-token"\s+content="([^"]+)"/);
+  if (!m) throw new Error(`Failed to read CSRF token (status ${res.status})`);
+  // Deno exposes multiple Set-Cookie headers via getSetCookie()
+  const setCookies = (res.headers as any).getSetCookie?.() ?? [];
+  const cookie = pickCookies(setCookies);
+  if (!cookie) throw new Error("No session cookies returned by deep-seek.ai");
+  DS_SESSION = { csrf: m[1], cookie, exp: now + DS_SESSION_TTL_MS };
+  return DS_SESSION;
 }
 
 // In-memory cache for API keys (per edge worker instance) — eliminates the
@@ -137,63 +156,53 @@ Deno.serve(async (req) => {
     );
   }
 
-  // DuckDuckGo expects only user/assistant turns; collapse system into first user.
-  const sys = messages.filter((m) => m.role === "system").map((m) => m.content).join("\n").trim();
-  let convo = messages.filter((m) => m.role !== "system");
-  if (sys && convo.length && convo[0].role === "user") {
-    convo = [{ role: "user", content: `${sys}\n\n${convo[0].content}` }, ...convo.slice(1)];
-  }
+  // deep-seek.ai accepts standard {role, content} (system role supported via OpenRouter).
+  const convo = messages;
   const totalLen = messages.reduce((acc, m) => acc + m.content.length, 0);
 
   // Decide mode: stream (default) or json (legacy)
   const wantStream = body?.stream !== false;
 
   try {
-    // 1) VQD handshake (with retry)
-    let vqd = "";
-    let handshakeErr = "";
-    for (let i = 1; i <= 3; i++) {
-      try { vqd = await fetchVqd(); break; }
-      catch (e) {
-        handshakeErr = e instanceof Error ? e.message : "vqd error";
-        if (i < 3) await new Promise((r) => setTimeout(r, 200 * i));
-      }
-    }
-    if (!vqd) {
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: "DuckDuckGo blocked the handshake from our server. (DDG actively blocks datacenter IPs — this is expected.) Try again or switch provider.",
-          raw: handshakeErr,
-        }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
-    }
-
     const upstreamBody = JSON.stringify({
-      model: body?.model || DDG_MODEL,
+      model: body?.model || DS_DEFAULT_MODEL,
       messages: convo,
     });
-    const doFetch = () =>
-      fetch(DDG_CHAT_URL, {
+    const doFetch = async (forceFreshSession = false) => {
+      const sess = await getSession(forceFreshSession);
+      return fetch(DS_API_URL, {
         method: "POST",
         headers: {
-          ...COMMON_DDG_HEADERS,
+          ...DS_COMMON_HEADERS,
           "Content-Type": "application/json",
-          "x-vqd-4": vqd,
+          "Accept": "text/event-stream",
+          "X-CSRF-TOKEN": sess.csrf,
+          "X-Requested-With": "XMLHttpRequest",
+          "Cookie": sess.cookie,
         },
         body: upstreamBody,
       });
+    };
 
     let upstreamRes: Response | null = null;
     let lastErr = "";
     const MAX_ATTEMPTS = 3;
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
       try {
-        upstreamRes = await doFetch();
+        // Force a fresh session on retries after a 419/401/403 (CSRF/session expired).
+        const fresh = attempt > 1 && upstreamRes
+          ? [401, 403, 419].includes(upstreamRes.status)
+          : false;
+        if (fresh) DS_SESSION = null;
+        upstreamRes = await doFetch(fresh);
         if (upstreamRes.ok && upstreamRes.body) break;
-        // Retry only 5xx / 429
-        if (upstreamRes.status >= 500 || upstreamRes.status === 429) {
+        if (
+          upstreamRes.status >= 500 ||
+          upstreamRes.status === 429 ||
+          upstreamRes.status === 419 ||
+          upstreamRes.status === 401 ||
+          upstreamRes.status === 403
+        ) {
           lastErr = `Upstream ${upstreamRes.status}`;
           try { await upstreamRes.body?.cancel(); } catch { /* ignore */ }
           if (attempt < MAX_ATTEMPTS) {
@@ -221,10 +230,17 @@ Deno.serve(async (req) => {
         success: false,
         error_message: `Upstream ${status}`,
       }).then(() => {});
+      // Try to surface deep-seek.ai's own error message (e.g. daily limit reached).
+      let providerMsg = "";
+      try { providerMsg = JSON.parse(errText)?.error || ""; } catch { /* ignore */ }
       const friendly =
-        status === 502 || status === 503 || status === 504
-          ? "The AI provider is temporarily overloaded. Please try again in a few seconds. (Tip: very large prompts are more likely to fail — try a shorter message.)"
-          : `Upstream error ${status}`;
+        status === 429
+          ? (providerMsg || "Daily free limit reached. Please try again later.")
+          : status >= 500
+            ? "The AI provider is temporarily overloaded. Please try again in a few seconds."
+            : status === 419 || status === 401 || status === 403
+              ? "Session with the upstream provider expired. Please retry."
+              : (providerMsg || `Upstream error ${status}`);
       return new Response(
         JSON.stringify({ success: false, error: friendly, status, raw: errText?.slice(0, 500) }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
@@ -232,9 +248,10 @@ Deno.serve(async (req) => {
     }
 
     if (wantStream) {
-      // DDG sends lines like:  data: {"message":"hello","created":..,"id":"..","model":"..","action":"success"}
-      // Frontend expects:      data: {"content":"hello"}
-      // We transform on the fly so existing client code keeps working.
+      // deep-seek.ai sends OpenRouter-style chunks:
+      //   data: {"choices":[{"delta":{"content":"hello"}}]}
+      // Plus colon-prefixed comments like ": OPENROUTER PROCESSING" we must skip.
+      // Frontend expects:  data: {"content":"hello"}
       queueMicrotask(() => {
         getSb().from("api_usage").insert({
           api_key_id: keyRow!.id,
@@ -255,6 +272,7 @@ Deno.serve(async (req) => {
           buf = lines.pop() || "";
           for (const line of lines) {
             const t = line.trim();
+            if (!t || t.startsWith(":")) continue; // SSE comment / keep-alive
             if (!t.startsWith("data:")) continue;
             const payload = t.slice(5).trim();
             if (!payload) continue;
@@ -264,9 +282,11 @@ Deno.serve(async (req) => {
             }
             try {
               const j = JSON.parse(payload);
-              const piece = typeof j.message === "string" ? j.message
-                          : typeof j.content === "string" ? j.content
-                          : "";
+              const piece =
+                j?.choices?.[0]?.delta?.content ??
+                j?.choices?.[0]?.message?.content ??
+                (typeof j.content === "string" ? j.content : "") ??
+                "";
               if (piece) {
                 controller.enqueue(enc.encode(`data: ${JSON.stringify({ content: piece })}\n\n`));
               }
@@ -303,13 +323,18 @@ Deno.serve(async (req) => {
       buf = lines.pop() || "";
       for (const line of lines) {
         const t = line.trim();
+        if (!t || t.startsWith(":")) continue;
         if (!t.startsWith("data:")) continue;
         const payload = t.slice(5).trim();
         if (!payload || payload === "[DONE]") continue;
         try {
           const j = JSON.parse(payload);
-          if (typeof j.message === "string") full += j.message;
-          else if (typeof j.content === "string") full += j.content;
+          const piece =
+            j?.choices?.[0]?.delta?.content ??
+            j?.choices?.[0]?.message?.content ??
+            (typeof j.content === "string" ? j.content : "") ??
+            "";
+          if (piece) full += piece;
         } catch { /* ignore */ }
       }
     }
