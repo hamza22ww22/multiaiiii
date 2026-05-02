@@ -7,9 +7,40 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const UPSTREAM_URL = "https://glmfivepointone.space-z.ai/api/chat";
+// DuckDuckGo AI Chat (unofficial) — VQD handshake + SSE
+const DDG_STATUS_URL = "https://duckduckgo.com/duckchat/v1/status";
+const DDG_CHAT_URL = "https://duckduckgo.com/duckchat/v1/chat";
+const DDG_MODEL = "gpt-4o-mini"; // also valid: "claude-3-haiku-20240307", "o3-mini",
+                                 // "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+                                 // "mistralai/Mistral-Small-24B-Instruct-2501"
+const UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 " +
+           "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
+const COMMON_DDG_HEADERS = {
+  "User-Agent": UA,
+  "Accept": "text/event-stream",
+  "Accept-Language": "en-US,en;q=0.9",
+  "Origin": "https://duckduckgo.com",
+  "Referer": "https://duckduckgo.com/",
+  "Sec-Fetch-Dest": "empty",
+  "Sec-Fetch-Mode": "cors",
+  "Sec-Fetch-Site": "same-origin",
+};
 
 type ChatMessage = { role: "user" | "assistant" | "system"; content: string };
+
+async function fetchVqd(): Promise<string> {
+  const res = await fetch(DDG_STATUS_URL, {
+    method: "GET",
+    headers: { ...COMMON_DDG_HEADERS, "x-vqd-accept": "1" },
+  });
+  // body must be consumed
+  try { await res.text(); } catch { /* ignore */ }
+  const vqd = res.headers.get("x-vqd-4") || res.headers.get("x-vqd-hash-1") || "";
+  if (!vqd) {
+    throw new Error(`DuckDuckGo VQD handshake failed (${res.status}). Provider may be blocking server IPs.`);
+  }
+  return vqd;
+}
 
 // In-memory cache for API keys (per edge worker instance) — eliminates the
 // Postgres round-trip on every chat request. Entries live for 5 minutes.
@@ -106,26 +137,50 @@ Deno.serve(async (req) => {
     );
   }
 
+  // DuckDuckGo expects only user/assistant turns; collapse system into first user.
+  const sys = messages.filter((m) => m.role === "system").map((m) => m.content).join("\n").trim();
+  let convo = messages.filter((m) => m.role !== "system");
+  if (sys && convo.length && convo[0].role === "user") {
+    convo = [{ role: "user", content: `${sys}\n\n${convo[0].content}` }, ...convo.slice(1)];
+  }
   const totalLen = messages.reduce((acc, m) => acc + m.content.length, 0);
 
   // Decide mode: stream (default) or json (legacy)
   const wantStream = body?.stream !== false;
 
   try {
-    // Retry upstream on 5xx / network errors with exponential backoff.
+    // 1) VQD handshake (with retry)
+    let vqd = "";
+    let handshakeErr = "";
+    for (let i = 1; i <= 3; i++) {
+      try { vqd = await fetchVqd(); break; }
+      catch (e) {
+        handshakeErr = e instanceof Error ? e.message : "vqd error";
+        if (i < 3) await new Promise((r) => setTimeout(r, 200 * i));
+      }
+    }
+    if (!vqd) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "DuckDuckGo blocked the handshake from our server. (DDG actively blocks datacenter IPs — this is expected.) Try again or switch provider.",
+          raw: handshakeErr,
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
     const upstreamBody = JSON.stringify({
-      messages,
-      fileContent: body?.fileContent ?? null,
-      fileName: body?.fileName ?? null,
+      model: body?.model || DDG_MODEL,
+      messages: convo,
     });
     const doFetch = () =>
-      fetch(UPSTREAM_URL, {
+      fetch(DDG_CHAT_URL, {
         method: "POST",
         headers: {
+          ...COMMON_DDG_HEADERS,
           "Content-Type": "application/json",
-          "Origin": "https://glmfivepointone.space-z.ai",
-          "Referer": "https://glmfivepointone.space-z.ai/",
-          "User-Agent": "Mozilla/5.0 (compatible; GLMProxy/1.0)",
+          "x-vqd-4": vqd,
         },
         body: upstreamBody,
       });
@@ -177,8 +232,9 @@ Deno.serve(async (req) => {
     }
 
     if (wantStream) {
-      // Pipe upstream straight to client — no tee, no extra reader, no extra
-      // buffering. Fastest possible TTFB. Log usage immediately in background.
+      // DDG sends lines like:  data: {"message":"hello","created":..,"id":"..","model":"..","action":"success"}
+      // Frontend expects:      data: {"content":"hello"}
+      // We transform on the fly so existing client code keeps working.
       queueMicrotask(() => {
         getSb().from("api_usage").insert({
           api_key_id: keyRow!.id,
@@ -188,7 +244,41 @@ Deno.serve(async (req) => {
         }).then(() => {});
       });
 
-      return new Response(upstreamRes.body, {
+      const upstream = upstreamRes.body!;
+      const dec = new TextDecoder();
+      const enc = new TextEncoder();
+      let buf = "";
+      const transform = new TransformStream<Uint8Array, Uint8Array>({
+        transform(chunk, controller) {
+          buf += dec.decode(chunk, { stream: true });
+          const lines = buf.split("\n");
+          buf = lines.pop() || "";
+          for (const line of lines) {
+            const t = line.trim();
+            if (!t.startsWith("data:")) continue;
+            const payload = t.slice(5).trim();
+            if (!payload) continue;
+            if (payload === "[DONE]") {
+              controller.enqueue(enc.encode("data: [DONE]\n\n"));
+              continue;
+            }
+            try {
+              const j = JSON.parse(payload);
+              const piece = typeof j.message === "string" ? j.message
+                          : typeof j.content === "string" ? j.content
+                          : "";
+              if (piece) {
+                controller.enqueue(enc.encode(`data: ${JSON.stringify({ content: piece })}\n\n`));
+              }
+            } catch { /* ignore */ }
+          }
+        },
+        flush(controller) {
+          controller.enqueue(enc.encode("data: [DONE]\n\n"));
+        },
+      });
+
+      return new Response(upstream.pipeThrough(transform), {
         status: 200,
         headers: {
           ...corsHeaders,
@@ -200,7 +290,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Non-stream mode: aggregate SSE into single JSON response
+    // Non-stream mode: aggregate DDG SSE into single JSON response
     const reader = upstreamRes.body.getReader();
     const dec = new TextDecoder();
     let buf = "";
@@ -218,8 +308,8 @@ Deno.serve(async (req) => {
         if (!payload || payload === "[DONE]") continue;
         try {
           const j = JSON.parse(payload);
-          if (typeof j.content === "string") full += j.content;
-          else if (typeof j.response === "string") full += j.response;
+          if (typeof j.message === "string") full += j.message;
+          else if (typeof j.content === "string") full += j.content;
         } catch { /* ignore */ }
       }
     }
