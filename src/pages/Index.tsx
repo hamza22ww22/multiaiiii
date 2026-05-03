@@ -76,8 +76,8 @@ const Index = () => {
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <header className="border-b border-white/10 px-6 py-4">
-        <h1 className="font-display text-lg font-semibold">DeepSeek Chat</h1>
-        <p className="text-xs text-muted-foreground">Free · Public · No login</p>
+        <h1 className="font-display text-lg font-semibold">AI Chat</h1>
+        <p className="text-xs text-muted-foreground">Powered by Lovable AI · Free · No login</p>
       </header>
       <div ref={scrollRef} className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-4 overflow-y-auto px-4 py-6">
         {messages.length === 0 && (
