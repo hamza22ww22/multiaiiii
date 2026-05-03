@@ -57,7 +57,7 @@ const Index = () => {
           if (!payload || payload === "[DONE]") continue;
           try {
             const j = JSON.parse(payload);
-            const chunk = typeof j.content === "string" ? j.content : "";
+            const chunk = j?.choices?.[0]?.delta?.content ?? "";
             if (chunk) {
               full += chunk;
               setMessages([...next, { role: "assistant", content: full }]);
