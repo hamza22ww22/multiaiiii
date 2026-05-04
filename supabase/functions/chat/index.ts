@@ -4,29 +4,40 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+const XPRIVO_URL = "https://www.xprivo.com/v1/chat/completions";
+const XPRIVO_MODELS = new Set(["xprivo", "qwen-latest", "mistral-3"]);
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
     const { messages, model } = await req.json();
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
+    const chosen = model || "xprivo";
+    const sys = { role: "system", content: "You are a helpful AI assistant. Keep answers clear and concise." };
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: model || "google/gemini-3-flash-preview",
-        messages: [
-          { role: "system", content: "You are a helpful AI assistant. Keep answers clear and concise." },
-          ...messages,
-        ],
-        stream: true,
-      }),
-    });
+    let response: Response;
+    if (XPRIVO_MODELS.has(chosen)) {
+      const apiKey = Deno.env.get("XPRIVO_API_KEY") || "API_KEY_XPRIVO";
+      response = await fetch(XPRIVO_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${apiKey}`,
+          "x-api-version": "2",
+          "x-lang-chat": "en",
+          "x-use-web": "off",
+        },
+        body: JSON.stringify({ model: chosen, messages: [sys, ...messages], stream: true }),
+      });
+    } else {
+      const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+      if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
+      response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ model: chosen, messages: [sys, ...messages], stream: true }),
+      });
+    }
 
     if (!response.ok) {
       if (response.status === 429) {
@@ -40,8 +51,8 @@ Deno.serve(async (req) => {
         });
       }
       const t = await response.text();
-      console.error("AI gateway error:", response.status, t);
-      return new Response(JSON.stringify({ error: "AI gateway error" }), {
+      console.error("Upstream error:", response.status, t);
+      return new Response(JSON.stringify({ error: `Upstream error (${response.status})` }), {
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }

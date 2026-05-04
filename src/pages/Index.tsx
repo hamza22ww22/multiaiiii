@@ -1,16 +1,25 @@
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2, Send } from "lucide-react";
 import { toast } from "sonner";
 
 type Msg = { role: "user" | "assistant"; content: string };
 const FUNCTIONS_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
 
+const MODELS = [
+  { id: "xprivo", label: "Xprivo" },
+  { id: "qwen-latest", label: "Qwen 3 (latest)" },
+  { id: "mistral-3", label: "Mistral 3" },
+  { id: "google/gemini-3-flash-preview", label: "Gemini 3 Flash" },
+];
+
 const Index = () => {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [model, setModel] = useState<string>("xprivo");
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -28,7 +37,7 @@ const Index = () => {
       const res = await fetch(FUNCTIONS_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: next, stream: true }),
+        body: JSON.stringify({ messages: next, model, stream: true }),
       });
       if (!res.ok || !res.body) {
         const err = await res.json().catch(() => ({}));
@@ -75,9 +84,19 @@ const Index = () => {
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
-      <header className="border-b border-white/10 px-6 py-4">
-        <h1 className="font-display text-lg font-semibold">AI Chat</h1>
-        <p className="text-xs text-muted-foreground">Powered by Lovable AI · Free · No login</p>
+      <header className="flex items-center justify-between border-b border-white/10 px-6 py-4">
+        <div>
+          <h1 className="font-display text-lg font-semibold">AI Chat</h1>
+          <p className="text-xs text-muted-foreground">Free · No login</p>
+        </div>
+        <Select value={model} onValueChange={setModel}>
+          <SelectTrigger className="w-[200px]"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            {MODELS.map((m) => (
+              <SelectItem key={m.id} value={m.id}>{m.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </header>
       <div ref={scrollRef} className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-4 overflow-y-auto px-4 py-6">
         {messages.length === 0 && (
