@@ -1,25 +1,34 @@
 import { useState, useRef, useEffect } from "react";
+import { Link } from "react-router-dom";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Send } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Loader2, Send, Globe, Image as ImageIcon, Code2 } from "lucide-react";
 import { toast } from "sonner";
 
-type Msg = { role: "user" | "assistant"; content: string };
+type Msg = { role: "user" | "assistant"; content: string; image?: string };
 const FUNCTIONS_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
 
 const MODELS = [
-  { id: "xprivo", label: "Xprivo" },
-  { id: "qwen-latest", label: "Qwen 3 (latest)" },
-  { id: "mistral-3", label: "Mistral 3" },
-  { id: "google/gemini-3-flash-preview", label: "Gemini 3 Flash" },
+  { id: "xprivo", label: "xPrivo", badge: "" },
+  { id: "qwen-latest", label: "Qwen 3", badge: "Reasoning" },
+  { id: "kimi-2.5", label: "Kimi 2.5", badge: "Reasoning · PRO" },
+  { id: "mistral-3", label: "Mistral 3", badge: "" },
+  { id: "gpt-5.2", label: "GPT 5.2", badge: "PRO" },
+  { id: "gemini-3-pro", label: "Gemini 3 PRO", badge: "PRO" },
+  { id: "gemini-3-pro-reasoning", label: "Gemini 3 PRO", badge: "Reasoning · PRO" },
 ];
 
 const Index = () => {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [model, setModel] = useState<string>("xprivo");
+  const [model, setModel] = useState("xprivo");
+  const [web, setWeb] = useState(false);
+  const [imageMode, setImageMode] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -37,17 +46,31 @@ const Index = () => {
       const res = await fetch(FUNCTIONS_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: next, model, stream: true }),
+        body: JSON.stringify({ messages: next, model, web, image: imageMode }),
       });
-      if (!res.ok || !res.body) {
+
+      const ct = res.headers.get("content-type") || "";
+
+      if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         throw new Error(err?.error || `Request failed (${res.status})`);
       }
-      const ct = res.headers.get("content-type") || "";
+
+      // JSON response (image gen)
       if (ct.includes("application/json")) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err?.error || "Upstream error");
+        const data = await res.json();
+        if (data.image) {
+          setMessages([...next, { role: "assistant", content: data.text || "", image: data.image }]);
+        } else if (data.error) {
+          throw new Error(data.error);
+        } else {
+          setMessages([...next, { role: "assistant", content: data.text || "(no response)" }]);
+        }
+        return;
       }
+
+      // SSE stream
+      if (!res.body) throw new Error("No response body");
       setMessages([...next, { role: "assistant", content: "" }]);
       const reader = res.body.getReader();
       const dec = new TextDecoder();
@@ -66,7 +89,7 @@ const Index = () => {
           if (!payload || payload === "[DONE]") continue;
           try {
             const j = JSON.parse(payload);
-            const chunk = j?.choices?.[0]?.delta?.content ?? "";
+            const chunk = j?.choices?.[0]?.delta?.content ?? j?.choices?.[0]?.message?.content ?? "";
             if (chunk) {
               full += chunk;
               setMessages([...next, { role: "assistant", content: full }]);
@@ -74,8 +97,8 @@ const Index = () => {
           } catch { /* ignore */ }
         }
       }
-    } catch (e: any) {
-      toast.error(e?.message || "Something went wrong");
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Something went wrong");
       setMessages(messages);
     } finally {
       setLoading(false);
@@ -84,52 +107,86 @@ const Index = () => {
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
-      <header className="flex items-center justify-between border-b border-white/10 px-6 py-4">
+      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 px-4 py-3 sm:px-6">
         <div>
           <h1 className="font-display text-lg font-semibold">AI Chat</h1>
-          <p className="text-xs text-muted-foreground">Free · No login</p>
+          <p className="text-xs text-muted-foreground">Free · No login · Multi-model</p>
         </div>
-        <Select value={model} onValueChange={setModel}>
-          <SelectTrigger className="w-[200px]"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            {MODELS.map((m) => (
-              <SelectItem key={m.id} value={m.id}>{m.label}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="flex items-center gap-2">
+          <Select value={model} onValueChange={setModel}>
+            <SelectTrigger className="w-[200px]"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {MODELS.map((m) => (
+                <SelectItem key={m.id} value={m.id}>
+                  <span>{m.label}</span>
+                  {m.badge && <span className="ml-2 text-xs text-muted-foreground">{m.badge}</span>}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Link to="/docs">
+            <Button variant="outline" size="sm"><Code2 className="mr-1 h-4 w-4" />API</Button>
+          </Link>
+        </div>
       </header>
+
       <div ref={scrollRef} className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-4 overflow-y-auto px-4 py-6">
         {messages.length === 0 && (
-          <p className="text-center text-sm text-muted-foreground">Ask me anything…</p>
+          <div className="mt-12 text-center">
+            <p className="text-sm text-muted-foreground">Ask me anything…</p>
+            <p className="mt-2 text-xs text-muted-foreground">Toggle 🌐 for web search · 🖼 for image generation</p>
+          </div>
         )}
         {messages.map((m, i) => (
           <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
-            <div className={`max-w-[80%] whitespace-pre-wrap rounded-2xl px-4 py-3 text-sm ${
+            <div className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm ${
               m.role === "user" ? "bg-foreground text-background" : "border border-white/10 bg-white/[0.04]"
             }`}>
-              {m.content || (loading && i === messages.length - 1 ? "…" : "")}
+              {m.image && <img src={m.image} alt="generated" className="mb-2 max-w-full rounded-lg" />}
+              {m.role === "assistant" ? (
+                <div className="prose prose-sm prose-invert max-w-none break-words">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.content || (loading && i === messages.length - 1 ? "…" : "")}</ReactMarkdown>
+                </div>
+              ) : (
+                <span className="whitespace-pre-wrap">{m.content}</span>
+              )}
             </div>
           </div>
         ))}
       </div>
+
       <div className="border-t border-white/10 p-4">
-        <div className="mx-auto flex max-w-3xl gap-2">
-          <Textarea
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                send();
-              }
-            }}
-            placeholder="Type a message..."
-            className="min-h-[48px] resize-none"
-            disabled={loading}
-          />
-          <Button onClick={send} disabled={loading || !input.trim()} size="icon" className="h-12 w-12 shrink-0">
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-          </Button>
+        <div className="mx-auto max-w-3xl space-y-2">
+          <div className="flex items-center gap-4 text-xs text-muted-foreground">
+            <label className="flex items-center gap-2">
+              <Globe className="h-3.5 w-3.5" />
+              <span>Web search</span>
+              <Switch checked={web} onCheckedChange={setWeb} />
+            </label>
+            <label className="flex items-center gap-2">
+              <ImageIcon className="h-3.5 w-3.5" />
+              <span>Image mode</span>
+              <Switch checked={imageMode} onCheckedChange={setImageMode} />
+            </label>
+          </div>
+          <div className="flex gap-2">
+            <Textarea
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  send();
+                }
+              }}
+              placeholder={imageMode ? "Describe the image…" : "Type a message..."}
+              className="min-h-[48px] resize-none"
+              disabled={loading}
+            />
+            <Button onClick={send} disabled={loading || !input.trim()} size="icon" className="h-12 w-12 shrink-0">
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+            </Button>
+          </div>
         </div>
       </div>
     </div>
