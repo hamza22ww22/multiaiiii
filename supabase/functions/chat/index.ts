@@ -10,14 +10,15 @@ const XPRIVO_URL = "https://www.xprivo.com/v1/chat/completions";
 const LOVABLE_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
 
 // model id -> { provider, upstreamModel, reasoning? }
+// All chat models route to xPrivo (free + unlimited). Image → Lovable Gateway.
 const MODEL_MAP: Record<string, { provider: "xprivo" | "lovable"; upstream: string; reasoning?: "low" | "medium" | "high" }> = {
   "xprivo":                 { provider: "xprivo",  upstream: "xprivo" },
   "qwen-latest":            { provider: "xprivo",  upstream: "qwen-latest" },
   "mistral-3":              { provider: "xprivo",  upstream: "mistral-3" },
-  "kimi-2.5":               { provider: "lovable", upstream: "openai/gpt-5-mini", reasoning: "medium" },
-  "gpt-5.2":                { provider: "lovable", upstream: "openai/gpt-5.2" },
-  "gemini-3-pro":           { provider: "lovable", upstream: "google/gemini-3.1-pro-preview" },
-  "gemini-3-pro-reasoning": { provider: "lovable", upstream: "google/gemini-3.1-pro-preview", reasoning: "high" },
+  "kimi-2.5":               { provider: "xprivo",  upstream: "kimi-2.5" },
+  "gpt-5.2":                { provider: "xprivo",  upstream: "gpt-5.2" },
+  "gemini-3-pro":           { provider: "xprivo",  upstream: "gemini-3-pro" },
+  "gemini-3-pro-reasoning": { provider: "xprivo",  upstream: "gemini-3-pro" },
   "image":                  { provider: "lovable", upstream: "google/gemini-2.5-flash-image" },
 };
 
@@ -45,14 +46,15 @@ Deno.serve(async (req) => {
     const cfg = MODEL_MAP[modelId];
     if (!cfg) return jsonResp({ error: `Unknown model: ${modelId}` }, 400);
 
-    // Optional API key tracking (no enforcement - free)
-    const supa = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+    // Optional API key tracking (non-blocking — fire & forget for speed)
     if (apiKey) {
-      const { data: keyRow } = await supa.from("api_keys").select("id, active").eq("key", apiKey).maybeSingle();
-      if (keyRow?.active) apiKeyId = keyRow.id;
+      const supa = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+      supa.from("api_keys").select("id, active").eq("key", apiKey).maybeSingle()
+        .then(({ data }) => { if (data?.active) apiKeyId = data.id; })
+        .catch(() => {});
     }
 
-    const sys = { role: "system", content: "You are a helpful AI assistant. Format with markdown when useful." };
+    const sys = { role: "system", content: "You are a fast, helpful AI assistant. Be concise. Use markdown when useful." };
 
     let upstream: Response;
 
@@ -108,7 +110,54 @@ Deno.serve(async (req) => {
       return jsonResp({ image: url, text });
     }
 
-    // Stream pass-through
+    // Stream pass-through with PRO-fallback detection.
+    // xPrivo returns the first SSE line as `data: {"error":{"message":"show_upgrade_pro"}}` for paid models.
+    // We peek the first chunk; if it's that error, transparently retry with the free `xprivo` model.
+    if (cfg.provider === "xprivo" && upstream.body) {
+      const reader = upstream.body.getReader();
+      const { value: firstChunk, done } = await reader.read();
+      const firstText = firstChunk ? new TextDecoder().decode(firstChunk) : "";
+
+      if (firstText.includes("show_upgrade_pro")) {
+        // Retry with free model
+        const xkey = Deno.env.get("XPRIVO_API_KEY") || "API_KEY_XPRIVO";
+        const retry = await fetch(XPRIVO_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${xkey}`,
+            "x-api-version": "2",
+            "x-lang-chat": "en",
+            "x-use-web": web ? "on" : "off",
+          },
+          body: JSON.stringify({ model: "xprivo", messages: [sys, ...messages], stream: true }),
+        });
+        return new Response(retry.body, {
+          headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
+        });
+      }
+
+      // Replay first chunk + remaining stream
+      const stream = new ReadableStream({
+        async start(controller) {
+          if (firstChunk) controller.enqueue(firstChunk);
+          if (done) { controller.close(); return; }
+          try {
+            while (true) {
+              const { value, done } = await reader.read();
+              if (done) break;
+              controller.enqueue(value);
+            }
+          } finally {
+            controller.close();
+          }
+        },
+      });
+      return new Response(stream, {
+        headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
+      });
+    }
+
     return new Response(upstream.body, {
       headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
     });
