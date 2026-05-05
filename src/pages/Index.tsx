@@ -20,6 +20,11 @@ const MODELS = [
   { id: "gpt-5.2", label: "GPT 5.2", badge: "PRO" },
   { id: "gemini-3-pro", label: "Gemini 3 PRO", badge: "PRO" },
   { id: "gemini-3-pro-reasoning", label: "Gemini 3 PRO", badge: "Reasoning · PRO" },
+  { id: "gemini-3.1-pro-preview", label: "Gemini 3.1 PRO", badge: "Rocket" },
+  { id: "gemini-3-flash-preview", label: "Gemini 3 Flash", badge: "Rocket" },
+  { id: "gemini-2.5-pro", label: "Gemini 2.5 PRO", badge: "Rocket" },
+  { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash", badge: "Rocket" },
+  { id: "gemma-3-27b-it", label: "Gemma 3 27B", badge: "Rocket" },
 ];
 
 const Index = () => {
