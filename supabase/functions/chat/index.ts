@@ -79,6 +79,13 @@ Deno.serve(async (req) => {
         },
         body: JSON.stringify({ model: cfg.upstream, messages: [sys, ...messages], stream: true }),
       });
+    } else if (cfg.provider === "rocket") {
+      const upModel = web && !cfg.upstream.includes(":search") ? `${cfg.upstream}:search` : cfg.upstream;
+      upstream = await fetch(ROCKET_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${ROCKET_KEY}` },
+        body: JSON.stringify({ model: upModel, messages: [sys, ...messages], stream: true }),
+      });
     } else {
       const LK = Deno.env.get("LOVABLE_API_KEY");
       if (!LK) throw new Error("LOVABLE_API_KEY not configured");
