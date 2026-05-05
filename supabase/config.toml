@@ -5,3 +5,5 @@ verify_jwt = false
 verify_jwt = false
 [functions.key-stats]
 verify_jwt = false
+[functions.v1]
+verify_jwt = false
