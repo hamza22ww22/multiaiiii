@@ -46,14 +46,15 @@ Deno.serve(async (req) => {
     const cfg = MODEL_MAP[modelId];
     if (!cfg) return jsonResp({ error: `Unknown model: ${modelId}` }, 400);
 
-    // Optional API key tracking (no enforcement - free)
-    const supa = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+    // Optional API key tracking (non-blocking — fire & forget for speed)
     if (apiKey) {
-      const { data: keyRow } = await supa.from("api_keys").select("id, active").eq("key", apiKey).maybeSingle();
-      if (keyRow?.active) apiKeyId = keyRow.id;
+      const supa = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+      supa.from("api_keys").select("id, active").eq("key", apiKey).maybeSingle()
+        .then(({ data }) => { if (data?.active) apiKeyId = data.id; })
+        .catch(() => {});
     }
 
-    const sys = { role: "system", content: "You are a helpful AI assistant. Format with markdown when useful." };
+    const sys = { role: "system", content: "You are a fast, helpful AI assistant. Be concise. Use markdown when useful." };
 
     let upstream: Response;
 
