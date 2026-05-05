@@ -110,7 +110,54 @@ Deno.serve(async (req) => {
       return jsonResp({ image: url, text });
     }
 
-    // Stream pass-through
+    // Stream pass-through with PRO-fallback detection.
+    // xPrivo returns the first SSE line as `data: {"error":{"message":"show_upgrade_pro"}}` for paid models.
+    // We peek the first chunk; if it's that error, transparently retry with the free `xprivo` model.
+    if (cfg.provider === "xprivo" && upstream.body) {
+      const reader = upstream.body.getReader();
+      const { value: firstChunk, done } = await reader.read();
+      const firstText = firstChunk ? new TextDecoder().decode(firstChunk) : "";
+
+      if (firstText.includes("show_upgrade_pro")) {
+        // Retry with free model
+        const xkey = Deno.env.get("XPRIVO_API_KEY") || "API_KEY_XPRIVO";
+        const retry = await fetch(XPRIVO_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${xkey}`,
+            "x-api-version": "2",
+            "x-lang-chat": "en",
+            "x-use-web": web ? "on" : "off",
+          },
+          body: JSON.stringify({ model: "xprivo", messages: [sys, ...messages], stream: true }),
+        });
+        return new Response(retry.body, {
+          headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
+        });
+      }
+
+      // Replay first chunk + remaining stream
+      const stream = new ReadableStream({
+        async start(controller) {
+          if (firstChunk) controller.enqueue(firstChunk);
+          if (done) { controller.close(); return; }
+          try {
+            while (true) {
+              const { value, done } = await reader.read();
+              if (done) break;
+              controller.enqueue(value);
+            }
+          } finally {
+            controller.close();
+          }
+        },
+      });
+      return new Response(stream, {
+        headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
+      });
+    }
+
     return new Response(upstream.body, {
       headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
     });
