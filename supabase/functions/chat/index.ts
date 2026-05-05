@@ -10,14 +10,15 @@ const XPRIVO_URL = "https://www.xprivo.com/v1/chat/completions";
 const LOVABLE_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
 
 // model id -> { provider, upstreamModel, reasoning? }
+// All chat models route to xPrivo (free + unlimited). Image → Lovable Gateway.
 const MODEL_MAP: Record<string, { provider: "xprivo" | "lovable"; upstream: string; reasoning?: "low" | "medium" | "high" }> = {
   "xprivo":                 { provider: "xprivo",  upstream: "xprivo" },
   "qwen-latest":            { provider: "xprivo",  upstream: "qwen-latest" },
   "mistral-3":              { provider: "xprivo",  upstream: "mistral-3" },
-  "kimi-2.5":               { provider: "lovable", upstream: "openai/gpt-5-mini", reasoning: "medium" },
-  "gpt-5.2":                { provider: "lovable", upstream: "openai/gpt-5.2" },
-  "gemini-3-pro":           { provider: "lovable", upstream: "google/gemini-3.1-pro-preview" },
-  "gemini-3-pro-reasoning": { provider: "lovable", upstream: "google/gemini-3.1-pro-preview", reasoning: "high" },
+  "kimi-2.5":               { provider: "xprivo",  upstream: "kimi-2.5" },
+  "gpt-5.2":                { provider: "xprivo",  upstream: "gpt-5.2" },
+  "gemini-3-pro":           { provider: "xprivo",  upstream: "gemini-3-pro" },
+  "gemini-3-pro-reasoning": { provider: "xprivo",  upstream: "gemini-3-pro" },
   "image":                  { provider: "lovable", upstream: "google/gemini-2.5-flash-image" },
 };
 
