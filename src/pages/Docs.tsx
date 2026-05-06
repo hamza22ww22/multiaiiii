@@ -186,15 +186,27 @@ const Docs = () => {
   // Apply auto-fill when model changes
   const onModelChange = (m: string) => {
     setSelectedModel(m);
-    if (m.includes("flash") || m.includes("pro")) {
-      setContextWindow("1000000");
-    } else if (m.includes("gpt-5")) {
-      setContextWindow("200000");
-      setMaxOutput("16384");
-    } else if (m.includes("gemma")) {
-      setContextWindow("32000");
+    const lower = m.toLowerCase();
+    if (lower.includes("flux") || lower.includes("sdxl")) {
+      setContextWindow("0"); setMaxOutput("0");
+    } else if (lower.includes("gemini") || (lower.includes("flash") && !lower.includes("v4-flash"))) {
+      setContextWindow("1000000"); setMaxOutput("8192");
+    } else if (lower.includes("gpt-5") || lower.includes("gpt-4")) {
+      setContextWindow("128000"); setMaxOutput("16384");
+    } else if (lower.includes("llama-4") || lower.includes("scout")) {
+      setContextWindow("131072"); setMaxOutput("8192");
+    } else if (lower.includes("llama-3.3") || lower.includes("70b") || lower.includes("120b")) {
+      setContextWindow("128000"); setMaxOutput("8192");
+    } else if (lower.includes("deepseek") || lower.includes("v4-pro") || lower.includes("v4-flash")) {
+      setContextWindow("64000"); setMaxOutput("8192");
+    } else if (lower.includes("kimi")) {
+      setContextWindow("200000"); setMaxOutput("8192");
+    } else if (lower.includes("gemma")) {
+      setContextWindow("32000"); setMaxOutput("8192");
+    } else if (lower.includes("turbo") || lower.includes("router")) {
+      setContextWindow("128000"); setMaxOutput("8192");
     } else {
-      setContextWindow("128000");
+      setContextWindow("32000"); setMaxOutput("4096");
     }
   };
 
