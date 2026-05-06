@@ -248,7 +248,7 @@ console.log(r.choices[0].message.content);`;
         {/* Hero */}
         <div className="grid gap-3 sm:grid-cols-3">
           <Feature icon={<Zap className="h-4 w-4" />} title="OpenAI Compatible" desc="Drop-in replacement for OpenAI SDKs" />
-          <Feature icon={<Globe className="h-4 w-4" />} title="11+ Models" desc="Gemini, GPT-5, Qwen, Kimi, Mistral, Gemma" />
+          <Feature icon={<Globe className="h-4 w-4" />} title="40+ Models" desc="Llama 4, Gemini, DeepSeek, Kimi, Qwen, GPT, Flux, Perplexity" />
           <Feature icon={<Lock className="h-4 w-4" />} title="No Login Required" desc="Generate a key instantly, track usage" />
         </div>
 
