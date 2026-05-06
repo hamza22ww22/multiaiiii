@@ -13,9 +13,58 @@ type Msg = { role: "user" | "assistant"; content: string; image?: string };
 const FUNCTIONS_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
 
 const MODELS = [
+  // Default
   { id: "xprivo", label: "xPrivo", badge: "" },
   { id: "qwen-latest", label: "Qwen 3", badge: "Reasoning" },
   { id: "mistral-3", label: "Mistral 3", badge: "" },
+  // Groq
+  { id: "llama-3.3-70b-versatile", label: "Llama 3.3 70B", badge: "Groq" },
+  { id: "meta-llama/llama-4-scout-17b-16e-instruct", label: "Llama 4 Scout 17B", badge: "Groq" },
+  { id: "qwen/qwen3-32b", label: "Qwen 3 32B", badge: "Groq" },
+  { id: "gpt-oss-120b", label: "GPT-OSS 120B", badge: "Groq" },
+  // NVIDIA
+  { id: "deepseek-ai/deepseek-v4-pro", label: "DeepSeek V4 Pro", badge: "NVIDIA" },
+  { id: "deepseek-ai/deepseek-v4-flash", label: "DeepSeek V4 Flash", badge: "NVIDIA" },
+  { id: "moonshotai/kimi-k2.6", label: "Kimi K2.6", badge: "NVIDIA" },
+  { id: "llama-3.1-8b", label: "Llama 3.1 8B", badge: "NVIDIA" },
+  { id: "granite-4", label: "Granite 4", badge: "NVIDIA" },
+  { id: "dolphin-3-8b", label: "Dolphin 3 8B", badge: "NVIDIA" },
+  { id: "exaone-3.5", label: "EXAONE 3.5", badge: "NVIDIA" },
+  { id: "nemotron-3-super", label: "Nemotron 3 Super", badge: "NVIDIA" },
+  { id: "command-r-plus", label: "Command R+", badge: "NVIDIA" },
+  { id: "aya-expanse-32b", label: "Aya Expanse 32B", badge: "NVIDIA" },
+  { id: "google/gemma-4-31B-it", label: "Gemma 4 31B", badge: "NVIDIA" },
+  { id: "google/gemma-4-26B-A4B-it", label: "Gemma 4 26B", badge: "NVIDIA" },
+  { id: "nvidia/Nemotron-3-Nano-Omni-30B-A3B-Reasoning", label: "Nemotron 3 Nano Omni", badge: "Reasoning" },
+  // gpt4free.pro
+  { id: "llama-4-scout", label: "Llama 4 Scout", badge: "gpt4free" },
+  { id: "deepseek-r1-32b", label: "DeepSeek R1 32B", badge: "Reasoning" },
+  { id: "qwen-3.6-instant", label: "Qwen 3.6 Instant", badge: "Fast" },
+  { id: "grok-4.1-mini:free", label: "Grok 4.1 Mini", badge: "Free" },
+  { id: "minimax-m2.5", label: "MiniMax M2.5", badge: "" },
+  // Pollinations
+  { id: "openai", label: "OpenAI (Polli)", badge: "" },
+  { id: "openai-fast", label: "OpenAI Fast", badge: "Fast" },
+  { id: "gpt-4o-mini", label: "GPT-4o Mini", badge: "" },
+  { id: "gpt-4.1-nano", label: "GPT-4.1 Nano", badge: "Fast" },
+  { id: "moirai-agent", label: "Moirai Agent", badge: "" },
+  { id: "llamascout", label: "LlamaScout", badge: "" },
+  { id: "deepseek-reasoning", label: "DeepSeek Reasoning", badge: "Reasoning" },
+  { id: "deepseek-r1", label: "DeepSeek R1", badge: "Reasoning" },
+  { id: "mistral", label: "Mistral", badge: "" },
+  // Gemini (g4f)
+  { id: "models/gemini-3-flash-preview", label: "Gemini 3 Flash", badge: "PRO" },
+  { id: "models/gemini-2.5-flash", label: "Gemini 2.5 Flash", badge: "" },
+  { id: "models/gemini-2.0-flash", label: "Gemini 2.0 Flash", badge: "" },
+  // Search
+  { id: "turbo", label: "Perplexity Turbo", badge: "Web" },
+  // Router
+  { id: "model-router3", label: "Azure Router", badge: "Auto" },
+  // Image
+  { id: "flux", label: "Flux Image", badge: "Image" },
+  { id: "flux-schnell", label: "Flux Schnell", badge: "Image" },
+  { id: "flux-dev", label: "Flux Dev", badge: "Image" },
+  { id: "sdxl-turbo", label: "SDXL Turbo", badge: "Image" },
 ];
 
 const Index = () => {
