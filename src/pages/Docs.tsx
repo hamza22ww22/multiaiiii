@@ -245,6 +245,26 @@ const r = await openai.chat.completions.create({
 });
 console.log(r.choices[0].message.content);`;
 
+  const toolsExample = `// Tool / function calling — works in n8n, Make, Cline, etc.
+const r = await openai.chat.completions.create({
+  model: "${selectedModel}",
+  messages: [{ role: "user", content: "What's the weather in Tokyo?" }],
+  tools: [{
+    type: "function",
+    function: {
+      name: "get_weather",
+      description: "Get current weather for a city",
+      parameters: {
+        type: "object",
+        properties: { city: { type: "string" } },
+        required: ["city"],
+      },
+    },
+  }],
+  tool_choice: "auto",
+});
+console.log(r.choices[0].message.tool_calls);`;
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       <header className="flex items-center justify-between border-b border-white/10 px-4 py-3 sm:px-6">
