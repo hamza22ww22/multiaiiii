@@ -15,16 +15,7 @@ const FUNCTIONS_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
 const MODELS = [
   { id: "xprivo", label: "xPrivo", badge: "" },
   { id: "qwen-latest", label: "Qwen 3", badge: "Reasoning" },
-  { id: "kimi-2.5", label: "Kimi 2.5", badge: "Reasoning · PRO" },
   { id: "mistral-3", label: "Mistral 3", badge: "" },
-  { id: "gpt-5.2", label: "GPT 5.2", badge: "PRO" },
-  { id: "gemini-3-pro", label: "Gemini 3 PRO", badge: "PRO" },
-  { id: "gemini-3-pro-reasoning", label: "Gemini 3 PRO", badge: "Reasoning · PRO" },
-  { id: "gemini-3.1-pro-preview", label: "Gemini 3.1 PRO", badge: "Rocket" },
-  { id: "gemini-3-flash-preview", label: "Gemini 3 Flash", badge: "Rocket" },
-  { id: "gemini-2.5-pro", label: "Gemini 2.5 PRO", badge: "Rocket" },
-  { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash", badge: "Rocket" },
-  { id: "gemma-3-27b-it", label: "Gemma 3 27B", badge: "Rocket" },
 ];
 
 const Index = () => {
