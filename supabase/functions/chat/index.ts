@@ -6,21 +6,185 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const XPRIVO_URL = "https://www.xprivo.com/v1/chat/completions";
-const LOVABLE_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
+const XPRIVO_URL   = "https://www.xprivo.com/v1/chat/completions";
+const LOVABLE_URL  = "https://ai.gateway.lovable.dev/v1/chat/completions";
+const G4F_GROQ     = "https://g4f.space/api/groq/chat/completions";
+const G4F_NVIDIA   = "https://g4f.space/api/nvidia/chat/completions";
+const G4F_GPT4FREE = "https://g4f.space/api/gpt4free.pro/chat/completions";
+const G4F_POLLI    = "https://g4f.space/api/pollinations/chat/completions";
+const G4F_GEMINI   = "https://g4f.space/api/gemini-v1beta/chat/completions";
+const G4F_PERPLEX  = "https://g4f.space/api/perplexity/chat/completions";
+const G4F_AZURE    = "https://g4f.space/api/azure/chat/completions";
+const POLLI_TEXT   = "https://text.pollinations.ai/openai";
+const POLLI_IMAGE  = "https://image.pollinations.ai/prompt";
 
-// model id -> { provider, upstreamModel, reasoning? }
-// All chat models route to xPrivo (free + unlimited). Image → Lovable Gateway.
-const MODEL_MAP: Record<string, { provider: "xprivo" | "lovable"; upstream: string; reasoning?: "low" | "medium" | "high" }> = {
-  "xprivo":                 { provider: "xprivo",  upstream: "xprivo" },
-  "qwen-latest":            { provider: "xprivo",  upstream: "qwen-latest" },
-  "mistral-3":              { provider: "xprivo",  upstream: "mistral-3" },
-  "image":                  { provider: "lovable", upstream: "google/gemini-2.5-flash-image" },
+type Provider = "xprivo" | "lovable" | "g4f-groq" | "g4f-nvidia" | "g4f-gpt4free" | "g4f-pollinations" | "g4f-gemini" | "g4f-perplexity" | "g4f-azure" | "pollinations-text" | "pollinations-image";
+
+const MODEL_MAP: Record<string, { provider: Provider; upstream: string }> = {
+  // === xPrivo (default kept) ===
+  "xprivo":      { provider: "xprivo", upstream: "xprivo" },
+  "qwen-latest": { provider: "xprivo", upstream: "qwen-latest" },
+  "mistral-3":   { provider: "xprivo", upstream: "mistral-3" },
+
+  // === Image (Lovable Gemini) ===
+  "image":       { provider: "lovable", upstream: "google/gemini-2.5-flash-image" },
+
+  // === Groq (g4f) ===
+  "meta-llama/llama-4-scout-17b-16e-instruct": { provider: "g4f-groq", upstream: "meta-llama/llama-4-scout-17b-16e-instruct" },
+  "llama-3.3-70b-versatile":                    { provider: "g4f-groq", upstream: "llama-3.3-70b-versatile" },
+  "qwen/qwen3-32b":                             { provider: "g4f-groq", upstream: "qwen/qwen3-32b" },
+  "gpt-oss-120b":                               { provider: "g4f-groq", upstream: "gpt-oss-120b" },
+
+  // === NVIDIA (g4f) ===
+  "llama-3.1-8b":                               { provider: "g4f-nvidia", upstream: "llama-3.1-8b" },
+  "deepseek-ai/deepseek-v4-pro":                { provider: "g4f-nvidia", upstream: "deepseek-ai/deepseek-v4-pro" },
+  "deepseek-ai/deepseek-v4-flash":              { provider: "g4f-nvidia", upstream: "deepseek-ai/deepseek-v4-flash" },
+  "deepseek-ai/DeepSeek-V4-Flash":              { provider: "g4f-nvidia", upstream: "deepseek-ai/DeepSeek-V4-Flash" },
+  "moonshotai/kimi-k2.6":                       { provider: "g4f-nvidia", upstream: "moonshotai/kimi-k2.6" },
+  "granite-4":                                  { provider: "g4f-nvidia", upstream: "granite-4" },
+  "dolphin-3-8b":                               { provider: "g4f-nvidia", upstream: "dolphin-3-8b" },
+  "exaone-3.5":                                 { provider: "g4f-nvidia", upstream: "exaone-3.5" },
+  "nemotron-3-super":                           { provider: "g4f-nvidia", upstream: "nemotron-3-super" },
+  "command-r-plus":                             { provider: "g4f-nvidia", upstream: "command-r-plus" },
+  "aya-expanse-32b":                            { provider: "g4f-nvidia", upstream: "aya-expanse-32b" },
+  "google/gemma-4-31B-it":                      { provider: "g4f-nvidia", upstream: "google/gemma-4-31B-it" },
+  "google/gemma-4-26B-A4B-it":                  { provider: "g4f-nvidia", upstream: "google/gemma-4-26B-A4B-it" },
+  "nvidia/Nemotron-3-Nano-Omni-30B-A3B-Reasoning": { provider: "g4f-nvidia", upstream: "nvidia/Nemotron-3-Nano-Omni-30B-A3B-Reasoning" },
+
+  // === gpt4free.pro (g4f) ===
+  "llama-4-scout":      { provider: "g4f-gpt4free", upstream: "llama-4-scout" },
+  "deepseek-r1-32b":    { provider: "g4f-gpt4free", upstream: "deepseek-r1-32b" },
+  "qwen-3.6-instant":   { provider: "g4f-gpt4free", upstream: "qwen-3.6-instant" },
+  "grok-4.1-mini:free": { provider: "g4f-gpt4free", upstream: "grok-4.1-mini:free" },
+  "minimax-m2.5":       { provider: "g4f-gpt4free", upstream: "minimax-m2.5" },
+
+  // === Pollinations via g4f ===
+  "openai":         { provider: "g4f-pollinations", upstream: "openai" },
+  "gpt-4o-mini":    { provider: "g4f-pollinations", upstream: "gpt-4o-mini" },
+  "moirai-agent":   { provider: "g4f-pollinations", upstream: "moirai-agent" },
+  "openai-fast":    { provider: "g4f-pollinations", upstream: "openai-fast" },
+
+  // === Gemini (g4f) ===
+  "models/gemini-2.5-flash":         { provider: "g4f-gemini", upstream: "models/gemini-2.5-flash" },
+  "models/gemini-2.0-flash":         { provider: "g4f-gemini", upstream: "models/gemini-2.0-flash" },
+  "models/gemini-3-flash-preview":   { provider: "g4f-gemini", upstream: "models/gemini-3-flash-preview" },
+
+  // === Perplexity (web search) ===
+  "turbo": { provider: "g4f-perplexity", upstream: "turbo" },
+
+  // === Azure router ===
+  "model-router3": { provider: "g4f-azure", upstream: "model-router3" },
+
+  // === Pollinations text endpoint ===
+  "gpt-4.1-nano":         { provider: "pollinations-text", upstream: "gpt-4.1-nano" },
+  "llamascout":           { provider: "pollinations-text", upstream: "llamascout" },
+  "deepseek-reasoning":   { provider: "pollinations-text", upstream: "deepseek-reasoning" },
+  "deepseek-r1":          { provider: "pollinations-text", upstream: "deepseek-r1" },
+  "mistral":              { provider: "pollinations-text", upstream: "mistral" },
+  "openai-audio":         { provider: "pollinations-text", upstream: "openai-audio" },
+
+  // === Image (Pollinations Flux family) — handled specially ===
+  "flux":         { provider: "pollinations-image", upstream: "flux" },
+  "flux-schnell": { provider: "pollinations-image", upstream: "flux-schnell" },
+  "flux-dev":     { provider: "pollinations-image", upstream: "flux-dev" },
+  "sdxl-turbo":   { provider: "pollinations-image", upstream: "sdxl-turbo" },
 };
 
 function jsonResp(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 }
+
+function endpointFor(p: Provider): string {
+  switch (p) {
+    case "xprivo": return XPRIVO_URL;
+    case "lovable": return LOVABLE_URL;
+    case "g4f-groq": return G4F_GROQ;
+    case "g4f-nvidia": return G4F_NVIDIA;
+    case "g4f-gpt4free": return G4F_GPT4FREE;
+    case "g4f-pollinations": return G4F_POLLI;
+    case "g4f-gemini": return G4F_GEMINI;
+    case "g4f-perplexity": return G4F_PERPLEX;
+    case "g4f-azure": return G4F_AZURE;
+    case "pollinations-text": return POLLI_TEXT;
+    default: return "";
+  }
+}
+
+// Accepts a model+messages+options, returns upstream Response.
+// Forwards tools, tool_choice, temperature, max_tokens, response_format for full OpenAI compatibility.
+export async function callUpstream(opts: {
+  modelId: string;
+  messages: any[];
+  stream: boolean;
+  web?: boolean;
+  tools?: any;
+  tool_choice?: any;
+  temperature?: number;
+  max_tokens?: number;
+  response_format?: any;
+}): Promise<Response> {
+  const cfg = MODEL_MAP[opts.modelId];
+  if (!cfg) throw new Error(`Unknown model: ${opts.modelId}`);
+
+  // Pollinations image: GET URL → return as JSON image
+  if (cfg.provider === "pollinations-image") {
+    const lastUser = [...opts.messages].reverse().find(m => m.role === "user");
+    const prompt = typeof lastUser?.content === "string" ? lastUser.content : JSON.stringify(lastUser?.content || "");
+    const url = `${POLLI_IMAGE}/${encodeURIComponent(prompt)}?model=${cfg.upstream}&nologo=true&safe=false`;
+    return new Response(JSON.stringify({
+      id: `img-${Date.now()}`,
+      object: "chat.completion",
+      created: Math.floor(Date.now() / 1000),
+      model: opts.modelId,
+      choices: [{
+        index: 0,
+        message: {
+          role: "assistant",
+          content: `![image](${url})`,
+          images: [{ image_url: { url } }],
+        },
+        finish_reason: "stop",
+      }],
+      usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
+    }), { headers: { "Content-Type": "application/json" } });
+  }
+
+  const url = endpointFor(cfg.provider);
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+
+  if (cfg.provider === "xprivo") {
+    headers["Authorization"] = `Bearer ${Deno.env.get("XPRIVO_API_KEY") || "API_KEY_XPRIVO"}`;
+    headers["x-api-version"] = "2";
+    headers["x-lang-chat"] = "en";
+    headers["x-use-web"] = opts.web ? "on" : "off";
+  } else if (cfg.provider === "lovable") {
+    const LK = Deno.env.get("LOVABLE_API_KEY");
+    if (!LK) throw new Error("LOVABLE_API_KEY not configured");
+    headers["Authorization"] = `Bearer ${LK}`;
+  }
+
+  // Build OpenAI-compatible body. Forward tools so automation platforms work.
+  const body: Record<string, unknown> = {
+    model: cfg.upstream,
+    messages: opts.messages,
+    stream: opts.stream,
+  };
+  if (opts.temperature !== undefined) body.temperature = opts.temperature;
+  if (opts.max_tokens !== undefined) body.max_tokens = opts.max_tokens;
+  if (opts.tools) body.tools = opts.tools;
+  if (opts.tool_choice) body.tool_choice = opts.tool_choice;
+  if (opts.response_format) body.response_format = opts.response_format;
+
+  // Image gen via Lovable
+  if (opts.modelId === "image" && cfg.provider === "lovable") {
+    body.modalities = ["image", "text"];
+    body.stream = false;
+  }
+
+  return await fetch(url, { method: "POST", headers, body: JSON.stringify(body) });
+}
+
+export { MODEL_MAP, corsHeaders, jsonResp };
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -32,17 +196,14 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { messages, model, web, image } = body;
+    const { messages, model, web, image, tools, tool_choice, temperature, max_tokens, response_format } = body;
     const apiKey = req.headers.get("x-api-key") || body.apiKey;
-
     messageLength = JSON.stringify(messages || []).length;
 
-    // Resolve model: image flag overrides
     const modelId = image ? "image" : (model || "xprivo");
-    const cfg = MODEL_MAP[modelId];
-    if (!cfg) return jsonResp({ error: `Unknown model: ${modelId}` }, 400);
+    if (!MODEL_MAP[modelId]) return jsonResp({ error: `Unknown model: ${modelId}` }, 400);
 
-    // Optional API key tracking (non-blocking — fire & forget for speed)
+    // Track key (non-blocking)
     if (apiKey) {
       const supa = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
       supa.from("api_keys").select("id, active").eq("key", apiKey).maybeSingle()
@@ -50,43 +211,13 @@ Deno.serve(async (req) => {
         .catch(() => {});
     }
 
-    const sys = { role: "system", content: "You are a fast, helpful AI assistant. Be concise. Use markdown when useful." };
+    const sys = { role: "system", content: "You are a fast, helpful AI assistant. Be concise. Use markdown when useful. When tools are provided, USE them to perform actions — do not just describe what you would do." };
+    const finalMessages = (messages || []).some((m: any) => m.role === "system") ? messages : [sys, ...messages];
 
-    let upstream: Response;
-
-    if (cfg.provider === "xprivo") {
-      const xkey = Deno.env.get("XPRIVO_API_KEY") || "API_KEY_XPRIVO";
-      upstream = await fetch(XPRIVO_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${xkey}`,
-          "x-api-version": "2",
-          "x-lang-chat": "en",
-          "x-use-web": web ? "on" : "off",
-        },
-        body: JSON.stringify({ model: cfg.upstream, messages: [sys, ...messages], stream: true }),
-      });
-    } else {
-      const LK = Deno.env.get("LOVABLE_API_KEY");
-      if (!LK) throw new Error("LOVABLE_API_KEY not configured");
-      const payload: Record<string, unknown> = {
-        model: cfg.upstream,
-        messages: [sys, ...messages],
-        stream: true,
-      };
-      if (cfg.reasoning) payload.reasoning = { effort: cfg.reasoning };
-      if (modelId === "image") {
-        payload.modalities = ["image", "text"];
-        payload.stream = false; // image gen not streamed
-        payload.messages = messages; // no system
-      }
-      upstream = await fetch(LOVABLE_URL, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${LK}`, "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-    }
+    const upstream = await callUpstream({
+      modelId, messages: finalMessages, stream: !image,
+      web, tools, tool_choice, temperature, max_tokens, response_format,
+    });
 
     if (!upstream.ok) {
       success = false;
@@ -95,45 +226,26 @@ Deno.serve(async (req) => {
       if (upstream.status === 429) return jsonResp({ error: "Rate limited. Try again shortly." }, 429);
       if (upstream.status === 402) return jsonResp({ error: "Credits exhausted." }, 402);
       console.error("Upstream", upstream.status, t.slice(0, 300));
-      return jsonResp({ error: `Upstream error (${upstream.status})` }, 502);
+      return jsonResp({ error: `Upstream error (${upstream.status}): ${t.slice(0,150)}` }, 502);
     }
 
-    // Image generation: return JSON directly
-    if (modelId === "image") {
+    // Image gen returns JSON
+    if (modelId === "image" || MODEL_MAP[modelId].provider === "pollinations-image") {
       const data = await upstream.json();
       const url = data?.choices?.[0]?.message?.images?.[0]?.image_url?.url || null;
       const text = data?.choices?.[0]?.message?.content || "";
       return jsonResp({ image: url, text });
     }
 
-    // Stream pass-through with PRO-fallback detection.
-    // xPrivo returns the first SSE line as `data: {"error":{"message":"show_upgrade_pro"}}` for paid models.
-    // We peek the first chunk; if it's that error, transparently retry with the free `xprivo` model.
-    if (cfg.provider === "xprivo" && upstream.body) {
+    // xPrivo PRO-fallback
+    if (MODEL_MAP[modelId].provider === "xprivo" && upstream.body) {
       const reader = upstream.body.getReader();
       const { value: firstChunk, done } = await reader.read();
       const firstText = firstChunk ? new TextDecoder().decode(firstChunk) : "";
-
       if (firstText.includes("show_upgrade_pro")) {
-        // Retry with free model
-        const xkey = Deno.env.get("XPRIVO_API_KEY") || "API_KEY_XPRIVO";
-        const retry = await fetch(XPRIVO_URL, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${xkey}`,
-            "x-api-version": "2",
-            "x-lang-chat": "en",
-            "x-use-web": web ? "on" : "off",
-          },
-          body: JSON.stringify({ model: "xprivo", messages: [sys, ...messages], stream: true }),
-        });
-        return new Response(retry.body, {
-          headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
-        });
+        const retry = await callUpstream({ modelId: "xprivo", messages: finalMessages, stream: true, web, tools, tool_choice, temperature, max_tokens });
+        return new Response(retry.body, { headers: { ...corsHeaders, "Content-Type": "text/event-stream" } });
       }
-
-      // Replay first chunk + remaining stream
       const stream = new ReadableStream({
         async start(controller) {
           if (firstChunk) controller.enqueue(firstChunk);
@@ -144,26 +256,19 @@ Deno.serve(async (req) => {
               if (done) break;
               controller.enqueue(value);
             }
-          } finally {
-            controller.close();
-          }
+          } finally { controller.close(); }
         },
       });
-      return new Response(stream, {
-        headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
-      });
+      return new Response(stream, { headers: { ...corsHeaders, "Content-Type": "text/event-stream" } });
     }
 
-    return new Response(upstream.body, {
-      headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
-    });
+    return new Response(upstream.body, { headers: { ...corsHeaders, "Content-Type": "text/event-stream" } });
   } catch (e) {
     success = false;
     errorMessage = e instanceof Error ? e.message : "Unknown error";
     console.error("chat error:", e);
     return jsonResp({ error: errorMessage }, 500);
   } finally {
-    // best-effort usage logging
     if (apiKeyId) {
       try {
         const supa = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);

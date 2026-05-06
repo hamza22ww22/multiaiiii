@@ -22,18 +22,58 @@ type Stats = {
   stats: { total_calls: number; success: number; errors: number; last_24h: number; working: boolean };
 };
 
-const ALL_MODELS = [
+const ALL_MODELS: { id: string; label: string; group: string }[] = [
   { id: "xprivo", label: "xPrivo (default)", group: "xPrivo" },
   { id: "qwen-latest", label: "Qwen 3", group: "xPrivo" },
-  { id: "kimi-2.5", label: "Kimi 2.5", group: "xPrivo" },
   { id: "mistral-3", label: "Mistral 3", group: "xPrivo" },
-  { id: "gpt-5.2", label: "GPT 5.2", group: "xPrivo" },
-  { id: "gemini-3-pro", label: "Gemini 3 PRO", group: "xPrivo" },
-  { id: "gemini-3.1-pro-preview", label: "Gemini 3.1 PRO", group: "Rocket" },
-  { id: "gemini-3-flash-preview", label: "Gemini 3 Flash", group: "Rocket" },
-  { id: "gemini-2.5-pro", label: "Gemini 2.5 PRO", group: "Rocket" },
-  { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash", group: "Rocket" },
-  { id: "gemma-3-27b-it", label: "Gemma 3 27B", group: "Rocket" },
+
+  { id: "llama-3.3-70b-versatile", label: "Llama 3.3 70B", group: "Groq" },
+  { id: "meta-llama/llama-4-scout-17b-16e-instruct", label: "Llama 4 Scout 17B", group: "Groq" },
+  { id: "qwen/qwen3-32b", label: "Qwen 3 32B", group: "Groq" },
+  { id: "gpt-oss-120b", label: "GPT-OSS 120B", group: "Groq" },
+
+  { id: "deepseek-ai/deepseek-v4-pro", label: "DeepSeek V4 Pro", group: "NVIDIA" },
+  { id: "deepseek-ai/deepseek-v4-flash", label: "DeepSeek V4 Flash", group: "NVIDIA" },
+  { id: "moonshotai/kimi-k2.6", label: "Kimi K2.6", group: "NVIDIA" },
+  { id: "llama-3.1-8b", label: "Llama 3.1 8B", group: "NVIDIA" },
+  { id: "granite-4", label: "Granite 4", group: "NVIDIA" },
+  { id: "dolphin-3-8b", label: "Dolphin 3 8B", group: "NVIDIA" },
+  { id: "exaone-3.5", label: "EXAONE 3.5", group: "NVIDIA" },
+  { id: "nemotron-3-super", label: "Nemotron 3 Super", group: "NVIDIA" },
+  { id: "command-r-plus", label: "Command R+", group: "NVIDIA" },
+  { id: "aya-expanse-32b", label: "Aya Expanse 32B", group: "NVIDIA" },
+  { id: "google/gemma-4-31B-it", label: "Gemma 4 31B", group: "NVIDIA" },
+  { id: "google/gemma-4-26B-A4B-it", label: "Gemma 4 26B", group: "NVIDIA" },
+  { id: "nvidia/Nemotron-3-Nano-Omni-30B-A3B-Reasoning", label: "Nemotron 3 Nano Omni Reasoning", group: "NVIDIA" },
+
+  { id: "llama-4-scout", label: "Llama 4 Scout", group: "gpt4free" },
+  { id: "deepseek-r1-32b", label: "DeepSeek R1 32B", group: "gpt4free" },
+  { id: "qwen-3.6-instant", label: "Qwen 3.6 Instant", group: "gpt4free" },
+  { id: "grok-4.1-mini:free", label: "Grok 4.1 Mini Free", group: "gpt4free" },
+  { id: "minimax-m2.5", label: "MiniMax M2.5", group: "gpt4free" },
+
+  { id: "openai", label: "OpenAI (Pollinations)", group: "Pollinations" },
+  { id: "openai-fast", label: "OpenAI Fast", group: "Pollinations" },
+  { id: "gpt-4o-mini", label: "GPT-4o Mini", group: "Pollinations" },
+  { id: "gpt-4.1-nano", label: "GPT-4.1 Nano", group: "Pollinations" },
+  { id: "moirai-agent", label: "Moirai Agent", group: "Pollinations" },
+  { id: "llamascout", label: "LlamaScout", group: "Pollinations" },
+  { id: "deepseek-reasoning", label: "DeepSeek Reasoning", group: "Pollinations" },
+  { id: "deepseek-r1", label: "DeepSeek R1", group: "Pollinations" },
+  { id: "mistral", label: "Mistral", group: "Pollinations" },
+  { id: "openai-audio", label: "OpenAI Audio", group: "Pollinations" },
+
+  { id: "models/gemini-3-flash-preview", label: "Gemini 3 Flash Preview", group: "Gemini" },
+  { id: "models/gemini-2.5-flash", label: "Gemini 2.5 Flash", group: "Gemini" },
+  { id: "models/gemini-2.0-flash", label: "Gemini 2.0 Flash", group: "Gemini" },
+
+  { id: "turbo", label: "Perplexity Turbo (web)", group: "Search" },
+  { id: "model-router3", label: "Azure Model Router", group: "Router" },
+
+  { id: "flux", label: "Flux", group: "Image" },
+  { id: "flux-schnell", label: "Flux Schnell", group: "Image" },
+  { id: "flux-dev", label: "Flux Dev", group: "Image" },
+  { id: "sdxl-turbo", label: "SDXL Turbo", group: "Image" },
 ];
 
 const Docs = () => {
@@ -146,15 +186,27 @@ const Docs = () => {
   // Apply auto-fill when model changes
   const onModelChange = (m: string) => {
     setSelectedModel(m);
-    if (m.includes("flash") || m.includes("pro")) {
-      setContextWindow("1000000");
-    } else if (m.includes("gpt-5")) {
-      setContextWindow("200000");
-      setMaxOutput("16384");
-    } else if (m.includes("gemma")) {
-      setContextWindow("32000");
+    const lower = m.toLowerCase();
+    if (lower.includes("flux") || lower.includes("sdxl")) {
+      setContextWindow("0"); setMaxOutput("0");
+    } else if (lower.includes("gemini") || (lower.includes("flash") && !lower.includes("v4-flash"))) {
+      setContextWindow("1000000"); setMaxOutput("8192");
+    } else if (lower.includes("gpt-5") || lower.includes("gpt-4")) {
+      setContextWindow("128000"); setMaxOutput("16384");
+    } else if (lower.includes("llama-4") || lower.includes("scout")) {
+      setContextWindow("131072"); setMaxOutput("8192");
+    } else if (lower.includes("llama-3.3") || lower.includes("70b") || lower.includes("120b")) {
+      setContextWindow("128000"); setMaxOutput("8192");
+    } else if (lower.includes("deepseek") || lower.includes("v4-pro") || lower.includes("v4-flash")) {
+      setContextWindow("64000"); setMaxOutput("8192");
+    } else if (lower.includes("kimi")) {
+      setContextWindow("200000"); setMaxOutput("8192");
+    } else if (lower.includes("gemma")) {
+      setContextWindow("32000"); setMaxOutput("8192");
+    } else if (lower.includes("turbo") || lower.includes("router")) {
+      setContextWindow("128000"); setMaxOutput("8192");
     } else {
-      setContextWindow("128000");
+      setContextWindow("32000"); setMaxOutput("4096");
     }
   };
 
@@ -193,6 +245,26 @@ const r = await openai.chat.completions.create({
 });
 console.log(r.choices[0].message.content);`;
 
+  const toolsExample = `// Tool / function calling — works in n8n, Make, Cline, etc.
+const r = await openai.chat.completions.create({
+  model: "${selectedModel}",
+  messages: [{ role: "user", content: "What's the weather in Tokyo?" }],
+  tools: [{
+    type: "function",
+    function: {
+      name: "get_weather",
+      description: "Get current weather for a city",
+      parameters: {
+        type: "object",
+        properties: { city: { type: "string" } },
+        required: ["city"],
+      },
+    },
+  }],
+  tool_choice: "auto",
+});
+console.log(r.choices[0].message.tool_calls);`;
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       <header className="flex items-center justify-between border-b border-white/10 px-4 py-3 sm:px-6">
@@ -208,7 +280,7 @@ console.log(r.choices[0].message.content);`;
         {/* Hero */}
         <div className="grid gap-3 sm:grid-cols-3">
           <Feature icon={<Zap className="h-4 w-4" />} title="OpenAI Compatible" desc="Drop-in replacement for OpenAI SDKs" />
-          <Feature icon={<Globe className="h-4 w-4" />} title="11+ Models" desc="Gemini, GPT-5, Qwen, Kimi, Mistral, Gemma" />
+          <Feature icon={<Globe className="h-4 w-4" />} title="40+ Models" desc="Llama 4, Gemini, DeepSeek, Kimi, Qwen, GPT, Flux, Perplexity" />
           <Feature icon={<Lock className="h-4 w-4" />} title="No Login Required" desc="Generate a key instantly, track usage" />
         </div>
 
@@ -377,6 +449,7 @@ console.log(r.choices[0].message.content);`;
               <TabsTrigger value="curl">cURL</TabsTrigger>
               <TabsTrigger value="js">JS/TS (OpenAI SDK)</TabsTrigger>
               <TabsTrigger value="py">Python (OpenAI SDK)</TabsTrigger>
+              <TabsTrigger value="tools">Tool Calling</TabsTrigger>
             </TabsList>
             <TabsContent value="curl">
               <CodeBlock code={curlExample} onCopy={() => copy(curlExample)} />
@@ -386,6 +459,9 @@ console.log(r.choices[0].message.content);`;
             </TabsContent>
             <TabsContent value="py">
               <CodeBlock code={pyExample} onCopy={() => copy(pyExample)} />
+            </TabsContent>
+            <TabsContent value="tools">
+              <CodeBlock code={toolsExample} onCopy={() => copy(toolsExample)} />
             </TabsContent>
           </Tabs>
         </Card>
