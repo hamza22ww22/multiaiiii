@@ -159,8 +159,8 @@ const Index = () => {
         </div>
         <div className="flex items-center gap-2">
           <Select value={model} onValueChange={setModel}>
-            <SelectTrigger className="w-[200px]"><SelectValue /></SelectTrigger>
-            <SelectContent>
+            <SelectTrigger className="w-[240px]"><SelectValue /></SelectTrigger>
+            <SelectContent className="max-h-[480px]">
               {MODELS.map((m) => (
                 <SelectItem key={m.id} value={m.id}>
                   <span>{m.label}</span>
