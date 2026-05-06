@@ -8,26 +8,14 @@ const corsHeaders = {
 
 const XPRIVO_URL = "https://www.xprivo.com/v1/chat/completions";
 const LOVABLE_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
-const ROCKET_URL = "http://server2.api.nikkcocompany.store:4000/v1/chat/completions";
-const ROCKET_KEY = "sk-8xMIqGFuWezqJyEWFWG4Ow";
 
 // model id -> { provider, upstreamModel, reasoning? }
 // All chat models route to xPrivo (free + unlimited). Image → Lovable Gateway.
-const MODEL_MAP: Record<string, { provider: "xprivo" | "lovable" | "rocket"; upstream: string; reasoning?: "low" | "medium" | "high" }> = {
+const MODEL_MAP: Record<string, { provider: "xprivo" | "lovable"; upstream: string; reasoning?: "low" | "medium" | "high" }> = {
   "xprivo":                 { provider: "xprivo",  upstream: "xprivo" },
   "qwen-latest":            { provider: "xprivo",  upstream: "qwen-latest" },
   "mistral-3":              { provider: "xprivo",  upstream: "mistral-3" },
-  "kimi-2.5":               { provider: "xprivo",  upstream: "kimi-2.5" },
-  "gpt-5.2":                { provider: "xprivo",  upstream: "gpt-5.2" },
-  "gemini-3-pro":           { provider: "xprivo",  upstream: "gemini-3-pro" },
-  "gemini-3-pro-reasoning": { provider: "xprivo",  upstream: "gemini-3-pro" },
   "image":                  { provider: "lovable", upstream: "google/gemini-2.5-flash-image" },
-  // Rocket-Hosting (Gemini AI Cloud) — OpenAI compatible
-  "gemini-3.1-pro-preview":        { provider: "rocket", upstream: "gemini-3.1-pro-preview" },
-  "gemini-3-flash-preview":        { provider: "rocket", upstream: "gemini-3-flash-preview" },
-  "gemini-2.5-pro":                { provider: "rocket", upstream: "gemini-2.5-pro" },
-  "gemini-2.5-flash":              { provider: "rocket", upstream: "gemini-2.5-flash" },
-  "gemma-3-27b-it":                { provider: "rocket", upstream: "gemma-3-27b-it" },
 };
 
 function jsonResp(body: unknown, status = 200) {
@@ -78,13 +66,6 @@ Deno.serve(async (req) => {
           "x-use-web": web ? "on" : "off",
         },
         body: JSON.stringify({ model: cfg.upstream, messages: [sys, ...messages], stream: true }),
-      });
-    } else if (cfg.provider === "rocket") {
-      const upModel = web && !cfg.upstream.includes(":search") ? `${cfg.upstream}:search` : cfg.upstream;
-      upstream = await fetch(ROCKET_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${ROCKET_KEY}` },
-        body: JSON.stringify({ model: upModel, messages: [sys, ...messages], stream: true }),
       });
     } else {
       const LK = Deno.env.get("LOVABLE_API_KEY");
