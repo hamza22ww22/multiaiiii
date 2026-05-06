@@ -449,6 +449,7 @@ console.log(r.choices[0].message.tool_calls);`;
               <TabsTrigger value="curl">cURL</TabsTrigger>
               <TabsTrigger value="js">JS/TS (OpenAI SDK)</TabsTrigger>
               <TabsTrigger value="py">Python (OpenAI SDK)</TabsTrigger>
+              <TabsTrigger value="tools">Tool Calling</TabsTrigger>
             </TabsList>
             <TabsContent value="curl">
               <CodeBlock code={curlExample} onCopy={() => copy(curlExample)} />
@@ -458,6 +459,9 @@ console.log(r.choices[0].message.tool_calls);`;
             </TabsContent>
             <TabsContent value="py">
               <CodeBlock code={pyExample} onCopy={() => copy(pyExample)} />
+            </TabsContent>
+            <TabsContent value="tools">
+              <CodeBlock code={toolsExample} onCopy={() => copy(toolsExample)} />
             </TabsContent>
           </Tabs>
         </Card>
