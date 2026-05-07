@@ -29,65 +29,34 @@ const MODEL_MAP: Record<string, { provider: Provider; upstream: string }> = {
   // === Image (Lovable Gemini) ===
   "image":       { provider: "lovable", upstream: "google/gemini-2.5-flash-image" },
 
-  // === Groq (g4f) ===
+  // === Groq (g4f) — verified working ===
   "meta-llama/llama-4-scout-17b-16e-instruct": { provider: "g4f-groq", upstream: "meta-llama/llama-4-scout-17b-16e-instruct" },
   "llama-3.3-70b-versatile":                    { provider: "g4f-groq", upstream: "llama-3.3-70b-versatile" },
   "qwen/qwen3-32b":                             { provider: "g4f-groq", upstream: "qwen/qwen3-32b" },
-  "gpt-oss-120b":                               { provider: "g4f-groq", upstream: "gpt-oss-120b" },
 
-  // === NVIDIA (g4f) ===
-  "llama-3.1-8b":                               { provider: "g4f-nvidia", upstream: "llama-3.1-8b" },
+  // === NVIDIA (g4f) — verified working ===
   "deepseek-ai/deepseek-v4-pro":                { provider: "g4f-nvidia", upstream: "deepseek-ai/deepseek-v4-pro" },
   "deepseek-ai/deepseek-v4-flash":              { provider: "g4f-nvidia", upstream: "deepseek-ai/deepseek-v4-flash" },
-  "deepseek-ai/DeepSeek-V4-Flash":              { provider: "g4f-nvidia", upstream: "deepseek-ai/DeepSeek-V4-Flash" },
   "moonshotai/kimi-k2.6":                       { provider: "g4f-nvidia", upstream: "moonshotai/kimi-k2.6" },
-  "granite-4":                                  { provider: "g4f-nvidia", upstream: "granite-4" },
-  "dolphin-3-8b":                               { provider: "g4f-nvidia", upstream: "dolphin-3-8b" },
-  "exaone-3.5":                                 { provider: "g4f-nvidia", upstream: "exaone-3.5" },
-  "nemotron-3-super":                           { provider: "g4f-nvidia", upstream: "nemotron-3-super" },
-  "command-r-plus":                             { provider: "g4f-nvidia", upstream: "command-r-plus" },
-  "aya-expanse-32b":                            { provider: "g4f-nvidia", upstream: "aya-expanse-32b" },
-  "google/gemma-4-31B-it":                      { provider: "g4f-nvidia", upstream: "google/gemma-4-31B-it" },
-  "google/gemma-4-26B-A4B-it":                  { provider: "g4f-nvidia", upstream: "google/gemma-4-26B-A4B-it" },
-  "nvidia/Nemotron-3-Nano-Omni-30B-A3B-Reasoning": { provider: "g4f-nvidia", upstream: "nvidia/Nemotron-3-Nano-Omni-30B-A3B-Reasoning" },
 
-  // === gpt4free.pro (g4f) ===
+  // === gpt4free.pro (g4f) — verified working ===
   "llama-4-scout":      { provider: "g4f-gpt4free", upstream: "llama-4-scout" },
   "deepseek-r1-32b":    { provider: "g4f-gpt4free", upstream: "deepseek-r1-32b" },
   "qwen-3.6-instant":   { provider: "g4f-gpt4free", upstream: "qwen-3.6-instant" },
-  "grok-4.1-mini:free": { provider: "g4f-gpt4free", upstream: "grok-4.1-mini:free" },
-  "minimax-m2.5":       { provider: "g4f-gpt4free", upstream: "minimax-m2.5" },
 
-  // === Pollinations via g4f ===
+  // === Pollinations via g4f — verified working ===
   "openai":         { provider: "g4f-pollinations", upstream: "openai" },
-  "gpt-4o-mini":    { provider: "g4f-pollinations", upstream: "gpt-4o-mini" },
-  "moirai-agent":   { provider: "g4f-pollinations", upstream: "moirai-agent" },
   "openai-fast":    { provider: "g4f-pollinations", upstream: "openai-fast" },
 
-  // === Gemini (g4f) ===
+  // === Gemini (g4f) — verified working ===
   "models/gemini-2.5-flash":         { provider: "g4f-gemini", upstream: "models/gemini-2.5-flash" },
-  "models/gemini-2.0-flash":         { provider: "g4f-gemini", upstream: "models/gemini-2.0-flash" },
   "models/gemini-3-flash-preview":   { provider: "g4f-gemini", upstream: "models/gemini-3-flash-preview" },
 
-  // === Perplexity (web search) ===
+  // === Perplexity (web search) — verified working ===
   "turbo": { provider: "g4f-perplexity", upstream: "turbo" },
 
-  // === Azure router ===
+  // === Azure router — verified working ===
   "model-router3": { provider: "g4f-azure", upstream: "model-router3" },
-
-  // === Pollinations text endpoint ===
-  "gpt-4.1-nano":         { provider: "pollinations-text", upstream: "gpt-4.1-nano" },
-  "llamascout":           { provider: "pollinations-text", upstream: "llamascout" },
-  "deepseek-reasoning":   { provider: "pollinations-text", upstream: "deepseek-reasoning" },
-  "deepseek-r1":          { provider: "pollinations-text", upstream: "deepseek-r1" },
-  "mistral":              { provider: "pollinations-text", upstream: "mistral" },
-  "openai-audio":         { provider: "pollinations-text", upstream: "openai-audio" },
-
-  // === Image (Pollinations Flux family) — handled specially ===
-  "flux":         { provider: "pollinations-image", upstream: "flux" },
-  "flux-schnell": { provider: "pollinations-image", upstream: "flux-schnell" },
-  "flux-dev":     { provider: "pollinations-image", upstream: "flux-dev" },
-  "sdxl-turbo":   { provider: "pollinations-image", upstream: "sdxl-turbo" },
 };
 
 function jsonResp(body: unknown, status = 200) {
