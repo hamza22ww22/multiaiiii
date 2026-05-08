@@ -1,0 +1,1 @@
+ALTER TABLE public.agent_tasks ALTER COLUMN model SET DEFAULT 'google/gemini-2.5-flash';
