@@ -9,6 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { Loader2, Send, Globe, Image as ImageIcon, Code2, Terminal } from "lucide-react";
 import { toast } from "sonner";
 import AgentPanel from "@/components/AgentPanel";
+import chatBg from "@/assets/chat-bg.png";
 
 type Msg = { role: "user" | "assistant"; content: string; image?: string };
 const FUNCTIONS_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
@@ -42,8 +43,15 @@ const MODELS = [
   { id: "model-router3", label: "Azure Router", badge: "Auto" },
 ];
 
+const STORAGE_KEY = "xprivo.chat.history.v1";
+
 const Index = () => {
-  const [messages, setMessages] = useState<Msg[]>([]);
+  const [messages, setMessages] = useState<Msg[]>(() => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      return raw ? (JSON.parse(raw) as Msg[]) : [];
+    } catch { return []; }
+  });
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [model, setModel] = useState("xprivo");
@@ -55,6 +63,19 @@ const Index = () => {
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, loading]);
+
+  // Persist chat history (cap last 200 messages to avoid storage bloat)
+  useEffect(() => {
+    try {
+      const trimmed = messages.slice(-200);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(trimmed));
+    } catch { /* quota */ }
+  }, [messages]);
+
+  const clearChat = () => {
+    setMessages([]);
+    try { localStorage.removeItem(STORAGE_KEY); } catch {}
+  };
 
   const send = async () => {
     const text = input.trim();
@@ -127,13 +148,24 @@ const Index = () => {
   };
 
   return (
-    <div className="flex min-h-screen flex-col bg-background">
+    <div
+      className="relative flex min-h-screen flex-col bg-background"
+      style={{
+        backgroundImage: `linear-gradient(to bottom, hsl(var(--background) / 0.82), hsl(var(--background) / 0.92)), url(${chatBg})`,
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+        backgroundAttachment: "fixed",
+      }}
+    >
       <header className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 px-4 py-3 sm:px-6">
         <div>
           <h1 className="font-display text-lg font-semibold">AI Chat</h1>
           <p className="text-xs text-muted-foreground">Free · No login · Multi-model</p>
         </div>
         <div className="flex items-center gap-2">
+          {messages.length > 0 && !agentMode && (
+            <Button variant="ghost" size="sm" onClick={clearChat} title="Clear chat history">Clear</Button>
+          )}
           <Button
             variant={agentMode ? "default" : "outline"}
             size="sm"
@@ -173,12 +205,14 @@ const Index = () => {
         {messages.map((m, i) => (
           <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
             <div className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm ${
-              m.role === "user" ? "bg-foreground text-background" : "border border-white/10 bg-white/[0.04]"
+              m.role === "user" ? "bg-foreground text-background shadow-lg" : "border border-white/10 bg-white/[0.04] backdrop-blur-sm"
             }`}>
               {m.image && <img src={m.image} alt="generated" className="mb-2 max-w-full rounded-lg" />}
               {m.role === "assistant" ? (
                 <div className="prose prose-sm prose-invert max-w-none break-words">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.content || (loading && i === messages.length - 1 ? "…" : "")}</ReactMarkdown>
+                  {m.content
+                    ? <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.content}</ReactMarkdown>
+                    : (loading && i === messages.length - 1 ? <TypingDots /> : null)}
                 </div>
               ) : (
                 <span className="whitespace-pre-wrap">{m.content}</span>
@@ -186,6 +220,13 @@ const Index = () => {
             </div>
           </div>
         ))}
+        {loading && messages[messages.length - 1]?.role === "user" && (
+          <div className="flex justify-start">
+            <div className="max-w-[85%] rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 backdrop-blur-sm">
+              <TypingDots />
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="border-t border-white/10 p-4">
