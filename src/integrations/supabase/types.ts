@@ -14,6 +14,86 @@ export type Database = {
   }
   public: {
     Tables: {
+      agent_steps: {
+        Row: {
+          content: string | null
+          created_at: string
+          id: string
+          idx: number
+          kind: string
+          task_id: string
+          tool_input: Json | null
+          tool_name: string | null
+          tool_output: string | null
+        }
+        Insert: {
+          content?: string | null
+          created_at?: string
+          id?: string
+          idx: number
+          kind: string
+          task_id: string
+          tool_input?: Json | null
+          tool_name?: string | null
+          tool_output?: string | null
+        }
+        Update: {
+          content?: string | null
+          created_at?: string
+          id?: string
+          idx?: number
+          kind?: string
+          task_id?: string
+          tool_input?: Json | null
+          tool_name?: string | null
+          tool_output?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_steps_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "agent_tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agent_tasks: {
+        Row: {
+          created_at: string
+          error: string | null
+          id: string
+          model: string
+          prompt: string
+          result: string | null
+          sandbox_id: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          error?: string | null
+          id?: string
+          model?: string
+          prompt: string
+          result?: string | null
+          sandbox_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          error?: string | null
+          id?: string
+          model?: string
+          prompt?: string
+          result?: string | null
+          sandbox_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       api_keys: {
         Row: {
           active: boolean
