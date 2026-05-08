@@ -11,6 +11,17 @@ const json = (b: unknown, s = 200) =>
   new Response(JSON.stringify(b), { status: s, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
 const LOVABLE_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
+const G4F_GROQ   = "https://g4f.space/api/groq/chat/completions";
+
+function aiEndpoint(model: string): { url: string; auth?: string; upstreamModel: string } {
+  // Free providers that support OpenAI tool-calling
+  if (model.startsWith("groq/") || model.includes("llama") || model.includes("qwen")) {
+    const upstream = model.replace(/^groq\//, "");
+    return { url: G4F_GROQ, upstreamModel: upstream };
+  }
+  // Fallback: Lovable gateway (requires credits)
+  return { url: LOVABLE_URL, auth: Deno.env.get("LOVABLE_API_KEY") || "", upstreamModel: model };
+}
 
 const TOOLS = [
   {
@@ -189,10 +200,13 @@ Deno.serve(async (req) => {
       const { steps } = await loadHistory(supa, task_id);
       const messages = buildMessages(task, steps);
 
-      const aiRes = await fetch(LOVABLE_URL, {
+      const ep = aiEndpoint(task.model);
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (ep.auth) headers["Authorization"] = `Bearer ${ep.auth}`;
+      const aiRes = await fetch(ep.url, {
         method: "POST",
-        headers: { "Authorization": `Bearer ${LK}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ model: task.model, messages, tools: TOOLS, tool_choice: "auto", stream: false }),
+        headers,
+        body: JSON.stringify({ model: ep.upstreamModel, messages, tools: TOOLS, tool_choice: "auto", stream: false }),
       });
       if (!aiRes.ok) {
         const t = await aiRes.text();
