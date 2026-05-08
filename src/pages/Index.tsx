@@ -6,8 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Loader2, Send, Globe, Image as ImageIcon, Code2 } from "lucide-react";
+import { Loader2, Send, Globe, Image as ImageIcon, Code2, Terminal } from "lucide-react";
 import { toast } from "sonner";
+import AgentPanel from "@/components/AgentPanel";
 
 type Msg = { role: "user" | "assistant"; content: string; image?: string };
 const FUNCTIONS_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
@@ -48,6 +49,7 @@ const Index = () => {
   const [model, setModel] = useState("xprivo");
   const [web, setWeb] = useState(false);
   const [imageMode, setImageMode] = useState(false);
+  const [agentMode, setAgentMode] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -132,6 +134,14 @@ const Index = () => {
           <p className="text-xs text-muted-foreground">Free · No login · Multi-model</p>
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            variant={agentMode ? "default" : "outline"}
+            size="sm"
+            onClick={() => setAgentMode((v) => !v)}
+            title="Agent mode: AI gets a real Linux sandbox"
+          >
+            <Terminal className="mr-1 h-4 w-4" />Agent
+          </Button>
           <Select value={model} onValueChange={setModel}>
             <SelectTrigger className="w-[240px]"><SelectValue /></SelectTrigger>
             <SelectContent className="max-h-[480px]">
@@ -149,6 +159,10 @@ const Index = () => {
         </div>
       </header>
 
+      {agentMode ? (
+        <div className="flex-1 overflow-hidden"><AgentPanel /></div>
+      ) : (
+      <>
       <div ref={scrollRef} className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-4 overflow-y-auto px-4 py-6">
         {messages.length === 0 && (
           <div className="mt-12 text-center">
@@ -208,6 +222,8 @@ const Index = () => {
           </div>
         </div>
       </div>
+      </>
+      )}
     </div>
   );
 };
