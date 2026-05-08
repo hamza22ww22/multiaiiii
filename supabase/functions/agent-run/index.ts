@@ -130,15 +130,19 @@ Rules:
 
 Task: ${task.prompt}` },
   ];
+  let lastCallId: string | null = null;
   for (const s of steps) {
     if (s.kind === "assistant") {
       const m: any = { role: "assistant", content: s.content || "" };
       if (s.tool_name) {
+        lastCallId = s.id;
         m.tool_calls = [{ id: s.id, type: "function", function: { name: s.tool_name, arguments: JSON.stringify(s.tool_input || {}) } }];
+      } else {
+        lastCallId = null;
       }
       msgs.push(m);
     } else if (s.kind === "tool") {
-      msgs.push({ role: "tool", tool_call_id: s.id, content: s.tool_output || "" });
+      msgs.push({ role: "tool", tool_call_id: lastCallId || s.id, content: s.tool_output || "" });
     } else if (s.kind === "user") {
       msgs.push({ role: "user", content: s.content || "" });
     }
