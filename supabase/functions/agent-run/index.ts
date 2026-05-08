@@ -165,7 +165,7 @@ Deno.serve(async (req) => {
     // Create task if new
     if (!task_id) {
       if (!prompt) return json({ error: "prompt required" }, 400);
-      const { data, error } = await supa.from("agent_tasks").insert({ prompt, model: model || "google/gemini-2.5-pro", status: "running" }).select().single();
+      const { data, error } = await supa.from("agent_tasks").insert({ prompt, model: model || "google/gemini-2.5-flash", status: "running" }).select().single();
       if (error) return json({ error: error.message }, 500);
       task_id = data.id;
     }
