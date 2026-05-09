@@ -26,9 +26,6 @@ const MODEL_MAP: Record<string, { provider: Provider; upstream: string }> = {
   "qwen-latest": { provider: "xprivo", upstream: "qwen-latest" },
   "mistral-3":   { provider: "xprivo", upstream: "mistral-3" },
 
-  // === Image (Lovable Gemini) ===
-  "image":       { provider: "lovable", upstream: "google/gemini-2.5-flash-image" },
-
   // === Groq (g4f) — verified working ===
   "meta-llama/llama-4-scout-17b-16e-instruct": { provider: "g4f-groq", upstream: "meta-llama/llama-4-scout-17b-16e-instruct" },
   "llama-3.3-70b-versatile":                    { provider: "g4f-groq", upstream: "llama-3.3-70b-versatile" },
