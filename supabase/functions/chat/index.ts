@@ -32,8 +32,6 @@ const MODEL_MAP: Record<string, { provider: Provider; upstream: string }> = {
   "qwen/qwen3-32b":                             { provider: "g4f-groq", upstream: "qwen/qwen3-32b" },
 
   // === NVIDIA (g4f) — verified working ===
-  "deepseek-ai/deepseek-v4-pro":                { provider: "g4f-nvidia", upstream: "deepseek-ai/deepseek-v4-pro" },
-  "deepseek-ai/deepseek-v4-flash":              { provider: "g4f-nvidia", upstream: "deepseek-ai/deepseek-v4-flash" },
   "moonshotai/kimi-k2.6":                       { provider: "g4f-nvidia", upstream: "moonshotai/kimi-k2.6" },
 
   // === gpt4free.pro (g4f) — verified working ===
