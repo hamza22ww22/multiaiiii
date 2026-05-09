@@ -158,7 +158,7 @@ Deno.serve(async (req) => {
     const apiKey = req.headers.get("x-api-key") || body.apiKey;
     messageLength = JSON.stringify(messages || []).length;
 
-    const modelId = image ? "image" : (model || "xprivo");
+    const modelId = model || "xprivo";
     if (!MODEL_MAP[modelId]) return jsonResp({ error: `Unknown model: ${modelId}` }, 400);
 
     // Track key (non-blocking)
