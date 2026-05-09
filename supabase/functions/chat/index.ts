@@ -26,17 +26,12 @@ const MODEL_MAP: Record<string, { provider: Provider; upstream: string }> = {
   "qwen-latest": { provider: "xprivo", upstream: "qwen-latest" },
   "mistral-3":   { provider: "xprivo", upstream: "mistral-3" },
 
-  // === Image (Lovable Gemini) ===
-  "image":       { provider: "lovable", upstream: "google/gemini-2.5-flash-image" },
-
   // === Groq (g4f) — verified working ===
   "meta-llama/llama-4-scout-17b-16e-instruct": { provider: "g4f-groq", upstream: "meta-llama/llama-4-scout-17b-16e-instruct" },
   "llama-3.3-70b-versatile":                    { provider: "g4f-groq", upstream: "llama-3.3-70b-versatile" },
   "qwen/qwen3-32b":                             { provider: "g4f-groq", upstream: "qwen/qwen3-32b" },
 
   // === NVIDIA (g4f) — verified working ===
-  "deepseek-ai/deepseek-v4-pro":                { provider: "g4f-nvidia", upstream: "deepseek-ai/deepseek-v4-pro" },
-  "deepseek-ai/deepseek-v4-flash":              { provider: "g4f-nvidia", upstream: "deepseek-ai/deepseek-v4-flash" },
   "moonshotai/kimi-k2.6":                       { provider: "g4f-nvidia", upstream: "moonshotai/kimi-k2.6" },
 
   // === gpt4free.pro (g4f) — verified working ===
@@ -144,12 +139,6 @@ export async function callUpstream(opts: {
   if (opts.tool_choice) body.tool_choice = opts.tool_choice;
   if (opts.response_format) body.response_format = opts.response_format;
 
-  // Image gen via Lovable
-  if (opts.modelId === "image" && cfg.provider === "lovable") {
-    body.modalities = ["image", "text"];
-    body.stream = false;
-  }
-
   return await fetch(url, { method: "POST", headers, body: JSON.stringify(body) });
 }
 
@@ -165,11 +154,11 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { messages, model, web, image, tools, tool_choice, temperature, max_tokens, response_format } = body;
+    const { messages, model, web, tools, tool_choice, temperature, max_tokens, response_format } = body;
     const apiKey = req.headers.get("x-api-key") || body.apiKey;
     messageLength = JSON.stringify(messages || []).length;
 
-    const modelId = image ? "image" : (model || "xprivo");
+    const modelId = model || "xprivo";
     if (!MODEL_MAP[modelId]) return jsonResp({ error: `Unknown model: ${modelId}` }, 400);
 
     // Track key (non-blocking)
@@ -184,7 +173,7 @@ Deno.serve(async (req) => {
     const finalMessages = (messages || []).some((m: any) => m.role === "system") ? messages : [sys, ...messages];
 
     const upstream = await callUpstream({
-      modelId, messages: finalMessages, stream: !image,
+      modelId, messages: finalMessages, stream: true,
       web, tools, tool_choice, temperature, max_tokens, response_format,
     });
 
@@ -196,14 +185,6 @@ Deno.serve(async (req) => {
       if (upstream.status === 402) return jsonResp({ error: "Credits exhausted." }, 402);
       console.error("Upstream", upstream.status, t.slice(0, 300));
       return jsonResp({ error: `Upstream error (${upstream.status}): ${t.slice(0,150)}` }, 502);
-    }
-
-    // Image gen returns JSON
-    if (modelId === "image" || MODEL_MAP[modelId].provider === "pollinations-image") {
-      const data = await upstream.json();
-      const url = data?.choices?.[0]?.message?.images?.[0]?.image_url?.url || null;
-      const text = data?.choices?.[0]?.message?.content || "";
-      return jsonResp({ image: url, text });
     }
 
     // xPrivo PRO-fallback

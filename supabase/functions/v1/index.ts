@@ -10,32 +10,23 @@ const corsHeaders = {
 };
 
 const XPRIVO_URL   = "https://www.xprivo.com/v1/chat/completions";
-const LOVABLE_URL  = "https://ai.gateway.lovable.dev/v1/chat/completions";
 const G4F_GROQ     = "https://g4f.space/api/groq/chat/completions";
-const G4F_NVIDIA   = "https://g4f.space/api/nvidia/chat/completions";
 const G4F_GPT4FREE = "https://g4f.space/api/gpt4free.pro/chat/completions";
 const G4F_POLLI    = "https://g4f.space/api/pollinations/chat/completions";
 const G4F_GEMINI   = "https://g4f.space/api/gemini-v1beta/chat/completions";
 const G4F_PERPLEX  = "https://g4f.space/api/perplexity/chat/completions";
 const G4F_AZURE    = "https://g4f.space/api/azure/chat/completions";
-const POLLI_TEXT   = "https://text.pollinations.ai/openai";
-const POLLI_IMAGE  = "https://image.pollinations.ai/prompt";
 
-type Provider = "xprivo" | "lovable" | "g4f-groq" | "g4f-nvidia" | "g4f-gpt4free" | "g4f-pollinations" | "g4f-gemini" | "g4f-perplexity" | "g4f-azure" | "pollinations-text" | "pollinations-image";
+type Provider = "xprivo" | "g4f-groq" | "g4f-gpt4free" | "g4f-pollinations" | "g4f-gemini" | "g4f-perplexity" | "g4f-azure";
 
 const MODEL_MAP: Record<string, { provider: Provider; upstream: string }> = {
   "xprivo":      { provider: "xprivo", upstream: "xprivo" },
   "qwen-latest": { provider: "xprivo", upstream: "qwen-latest" },
   "mistral-3":   { provider: "xprivo", upstream: "mistral-3" },
-  "google/gemini-2.5-flash-image": { provider: "lovable", upstream: "google/gemini-2.5-flash-image" },
 
   "meta-llama/llama-4-scout-17b-16e-instruct": { provider: "g4f-groq", upstream: "meta-llama/llama-4-scout-17b-16e-instruct" },
   "llama-3.3-70b-versatile":                    { provider: "g4f-groq", upstream: "llama-3.3-70b-versatile" },
   "qwen/qwen3-32b":                             { provider: "g4f-groq", upstream: "qwen/qwen3-32b" },
-
-  "deepseek-ai/deepseek-v4-pro":                { provider: "g4f-nvidia", upstream: "deepseek-ai/deepseek-v4-pro" },
-  "deepseek-ai/deepseek-v4-flash":              { provider: "g4f-nvidia", upstream: "deepseek-ai/deepseek-v4-flash" },
-  "moonshotai/kimi-k2.6":                       { provider: "g4f-nvidia", upstream: "moonshotai/kimi-k2.6" },
 
   "llama-4-scout":      { provider: "g4f-gpt4free", upstream: "llama-4-scout" },
   "deepseek-r1-32b":    { provider: "g4f-gpt4free", upstream: "deepseek-r1-32b" },
@@ -62,15 +53,12 @@ function jsonResp(body: unknown, status = 200) {
 function endpointFor(p: Provider): string {
   switch (p) {
     case "xprivo": return XPRIVO_URL;
-    case "lovable": return LOVABLE_URL;
     case "g4f-groq": return G4F_GROQ;
-    case "g4f-nvidia": return G4F_NVIDIA;
     case "g4f-gpt4free": return G4F_GPT4FREE;
     case "g4f-pollinations": return G4F_POLLI;
     case "g4f-gemini": return G4F_GEMINI;
     case "g4f-perplexity": return G4F_PERPLEX;
     case "g4f-azure": return G4F_AZURE;
-    case "pollinations-text": return POLLI_TEXT;
     default: return "";
   }
 }
@@ -120,21 +108,6 @@ Deno.serve(async (req) => {
 
     const wantStream = stream !== false;
 
-    // Pollinations image model — return OpenAI-shape JSON with image URL
-    if (cfg.provider === "pollinations-image") {
-      const lastUser = [...messages].reverse().find((m: any) => m.role === "user");
-      const prompt = typeof lastUser?.content === "string" ? lastUser.content : JSON.stringify(lastUser?.content || "");
-      const imgUrl = `${POLLI_IMAGE}/${encodeURIComponent(prompt)}?model=${cfg.upstream}&nologo=true&safe=false`;
-      return jsonResp({
-        id: `chatcmpl-${Date.now()}`,
-        object: "chat.completion",
-        created: Math.floor(Date.now() / 1000),
-        model: modelId,
-        choices: [{ index: 0, message: { role: "assistant", content: `![image](${imgUrl})` }, finish_reason: "stop" }],
-        usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
-      });
-    }
-
     const upstreamUrl = endpointFor(cfg.provider);
     const headers: Record<string, string> = { "Content-Type": "application/json" };
     if (cfg.provider === "xprivo") {
@@ -142,13 +115,8 @@ Deno.serve(async (req) => {
       headers["x-api-version"] = "2";
       headers["x-lang-chat"] = "en";
       headers["x-use-web"] = web ? "on" : "off";
-    } else if (cfg.provider === "lovable") {
-      const LK = Deno.env.get("LOVABLE_API_KEY");
-      if (!LK) throw new Error("LOVABLE_API_KEY not configured");
-      headers["Authorization"] = `Bearer ${LK}`;
     }
 
-    // Forward all OpenAI fields (especially tools / tool_choice) so automation works
     const upstreamBody: Record<string, unknown> = {
       model: cfg.upstream,
       messages,
