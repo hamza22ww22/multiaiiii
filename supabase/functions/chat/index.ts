@@ -154,7 +154,7 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { messages, model, web, image, tools, tool_choice, temperature, max_tokens, response_format } = body;
+    const { messages, model, web, tools, tool_choice, temperature, max_tokens, response_format } = body;
     const apiKey = req.headers.get("x-api-key") || body.apiKey;
     messageLength = JSON.stringify(messages || []).length;
 
