@@ -139,12 +139,6 @@ export async function callUpstream(opts: {
   if (opts.tool_choice) body.tool_choice = opts.tool_choice;
   if (opts.response_format) body.response_format = opts.response_format;
 
-  // Image gen via Lovable
-  if (opts.modelId === "image" && cfg.provider === "lovable") {
-    body.modalities = ["image", "text"];
-    body.stream = false;
-  }
-
   return await fetch(url, { method: "POST", headers, body: JSON.stringify(body) });
 }
 
