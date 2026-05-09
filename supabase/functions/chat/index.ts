@@ -187,14 +187,6 @@ Deno.serve(async (req) => {
       return jsonResp({ error: `Upstream error (${upstream.status}): ${t.slice(0,150)}` }, 502);
     }
 
-    // Image gen returns JSON
-    if (modelId === "image" || MODEL_MAP[modelId].provider === "pollinations-image") {
-      const data = await upstream.json();
-      const url = data?.choices?.[0]?.message?.images?.[0]?.image_url?.url || null;
-      const text = data?.choices?.[0]?.message?.content || "";
-      return jsonResp({ image: url, text });
-    }
-
     // xPrivo PRO-fallback
     if (MODEL_MAP[modelId].provider === "xprivo" && upstream.body) {
       const reader = upstream.body.getReader();
