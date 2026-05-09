@@ -173,7 +173,7 @@ Deno.serve(async (req) => {
     const finalMessages = (messages || []).some((m: any) => m.role === "system") ? messages : [sys, ...messages];
 
     const upstream = await callUpstream({
-      modelId, messages: finalMessages, stream: !image,
+      modelId, messages: finalMessages, stream: true,
       web, tools, tool_choice, temperature, max_tokens, response_format,
     });
 
