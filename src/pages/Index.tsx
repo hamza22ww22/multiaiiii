@@ -10,37 +10,23 @@ import { Loader2, Send, Globe, Image as ImageIcon, Code2, Terminal } from "lucid
 import { toast } from "sonner";
 import AgentPanel from "@/components/AgentPanel";
 import chatBg from "@/assets/chat-bg.png";
+import { PROVIDER_MODELS } from "@/lib/g4f-catalog";
 
 type Msg = { role: "user" | "assistant"; content: string; image?: string };
 const FUNCTIONS_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
 
-const MODELS = [
-  // Default
-  { id: "xprivo", label: "xPrivo", badge: "" },
-  { id: "qwen-latest", label: "Qwen 3", badge: "Reasoning" },
-  { id: "mistral-3", label: "Mistral 3", badge: "" },
-  // Groq
-  { id: "llama-3.3-70b-versatile", label: "Llama 3.3 70B", badge: "Groq" },
-  { id: "meta-llama/llama-4-scout-17b-16e-instruct", label: "Llama 4 Scout 17B", badge: "Groq" },
-  { id: "qwen/qwen3-32b", label: "Qwen 3 32B", badge: "Groq" },
-  // NVIDIA
-  { id: "deepseek-ai/deepseek-v4-pro", label: "DeepSeek V4 Pro", badge: "NVIDIA" },
-  { id: "deepseek-ai/deepseek-v4-flash", label: "DeepSeek V4 Flash", badge: "NVIDIA" },
-  { id: "moonshotai/kimi-k2.6", label: "Kimi K2.6", badge: "NVIDIA" },
-  // gpt4free.pro
-  { id: "llama-4-scout", label: "Llama 4 Scout", badge: "gpt4free" },
-  { id: "deepseek-r1-32b", label: "DeepSeek R1 32B", badge: "Reasoning" },
-  { id: "qwen-3.6-instant", label: "Qwen 3.6 Instant", badge: "Fast" },
-  // Pollinations
-  { id: "openai", label: "OpenAI (Polli)", badge: "" },
-  { id: "openai-fast", label: "OpenAI Fast", badge: "Fast" },
-  // Gemini (g4f)
-  { id: "models/gemini-3-flash-preview", label: "Gemini 3 Flash", badge: "PRO" },
-  { id: "models/gemini-2.5-flash", label: "Gemini 2.5 Flash", badge: "" },
-  // Search
-  { id: "turbo", label: "Perplexity Turbo", badge: "Web" },
-  // Router
-  { id: "model-router3", label: "Azure Router", badge: "Auto" },
+// Built from the g4f.dev catalog: every provider + every model.
+// IDs use "<provider>:<model>" format for unambiguous routing.
+const MODEL_GROUPS: { provider: string; models: { id: string; label: string }[] }[] = [
+  { provider: "xPrivo", models: [
+    { id: "xprivo", label: "xPrivo" },
+    { id: "qwen-latest", label: "Qwen 3 (Reasoning)" },
+    { id: "mistral-3", label: "Mistral 3" },
+  ]},
+  ...Object.entries(PROVIDER_MODELS).map(([prov, list]) => ({
+    provider: prov,
+    models: list.map((m) => ({ id: `${prov}:${m}`, label: m })),
+  })),
 ];
 
 const STORAGE_KEY = "xprivo.chat.history.v1";
@@ -185,11 +171,17 @@ const Index = () => {
           <Select value={model} onValueChange={setModel}>
             <SelectTrigger className="w-[240px]"><SelectValue /></SelectTrigger>
             <SelectContent className="max-h-[480px]">
-              {MODELS.map((m) => (
-                <SelectItem key={m.id} value={m.id}>
-                  <span>{m.label}</span>
-                  {m.badge && <span className="ml-2 text-xs text-muted-foreground">{m.badge}</span>}
-                </SelectItem>
+              {MODEL_GROUPS.map((g) => (
+                <div key={g.provider}>
+                  <div className="sticky top-0 z-10 bg-popover px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    {g.provider} · {g.models.length}
+                  </div>
+                  {g.models.map((m) => (
+                    <SelectItem key={m.id} value={m.id}>
+                      <span className="truncate">{m.label}</span>
+                    </SelectItem>
+                  ))}
+                </div>
               ))}
             </SelectContent>
           </Select>

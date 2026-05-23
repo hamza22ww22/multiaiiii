@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { PROVIDER_MODELS, PROVIDER_ENDPOINT } from "./_catalog.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -8,70 +9,30 @@ const corsHeaders = {
 
 const XPRIVO_URL   = "https://www.xprivo.com/v1/chat/completions";
 const LOVABLE_URL  = "https://ai.gateway.lovable.dev/v1/chat/completions";
-const G4F_GROQ     = "https://g4f.space/api/groq/chat/completions";
-const G4F_NVIDIA   = "https://g4f.space/api/nvidia/chat/completions";
-const G4F_GPT4FREE = "https://g4f.space/api/gpt4free.pro/chat/completions";
-const G4F_POLLI    = "https://g4f.space/api/pollinations/chat/completions";
-const G4F_GEMINI   = "https://g4f.space/api/gemini-v1beta/chat/completions";
-const G4F_PERPLEX  = "https://g4f.space/api/perplexity/chat/completions";
-const G4F_AZURE    = "https://g4f.space/api/azure/chat/completions";
-const POLLI_TEXT   = "https://text.pollinations.ai/openai";
 const POLLI_IMAGE  = "https://image.pollinations.ai/prompt";
 
-type Provider = "xprivo" | "lovable" | "g4f-groq" | "g4f-nvidia" | "g4f-gpt4free" | "g4f-pollinations" | "g4f-gemini" | "g4f-perplexity" | "g4f-azure" | "pollinations-text" | "pollinations-image";
+const XPRIVO_MODELS = new Set(["xprivo", "qwen-latest", "mistral-3"]);
 
-const MODEL_MAP: Record<string, { provider: Provider; upstream: string }> = {
-  // === xPrivo (default kept) ===
-  "xprivo":      { provider: "xprivo", upstream: "xprivo" },
-  "qwen-latest": { provider: "xprivo", upstream: "qwen-latest" },
-  "mistral-3":   { provider: "xprivo", upstream: "mistral-3" },
-
-  // === Groq (g4f) — verified working ===
-  "meta-llama/llama-4-scout-17b-16e-instruct": { provider: "g4f-groq", upstream: "meta-llama/llama-4-scout-17b-16e-instruct" },
-  "llama-3.3-70b-versatile":                    { provider: "g4f-groq", upstream: "llama-3.3-70b-versatile" },
-  "qwen/qwen3-32b":                             { provider: "g4f-groq", upstream: "qwen/qwen3-32b" },
-
-  // === NVIDIA (g4f) — verified working ===
-  "moonshotai/kimi-k2.6":                       { provider: "g4f-nvidia", upstream: "moonshotai/kimi-k2.6" },
-
-  // === gpt4free.pro (g4f) — verified working ===
-  "llama-4-scout":      { provider: "g4f-gpt4free", upstream: "llama-4-scout" },
-  "deepseek-r1-32b":    { provider: "g4f-gpt4free", upstream: "deepseek-r1-32b" },
-  "qwen-3.6-instant":   { provider: "g4f-gpt4free", upstream: "qwen-3.6-instant" },
-
-  // === Pollinations via g4f — verified working ===
-  "openai":         { provider: "g4f-pollinations", upstream: "openai" },
-  "openai-fast":    { provider: "g4f-pollinations", upstream: "openai-fast" },
-
-  // === Gemini (g4f) — verified working ===
-  "models/gemini-2.5-flash":         { provider: "g4f-gemini", upstream: "models/gemini-2.5-flash" },
-  "models/gemini-3-flash-preview":   { provider: "g4f-gemini", upstream: "models/gemini-3-flash-preview" },
-
-  // === Perplexity (web search) — verified working ===
-  "turbo": { provider: "g4f-perplexity", upstream: "turbo" },
-
-  // === Azure router — verified working ===
-  "model-router3": { provider: "g4f-azure", upstream: "model-router3" },
-};
+function resolveModel(modelId: string): { endpoint: string; upstream: string; provider: string } | null {
+  if (XPRIVO_MODELS.has(modelId)) return { endpoint: XPRIVO_URL, upstream: modelId, provider: "xprivo" };
+  if (modelId === "lovable") return { endpoint: LOVABLE_URL, upstream: "google/gemini-2.5-flash", provider: "lovable" };
+  const idx = modelId.indexOf(":");
+  if (idx > 0) {
+    const prov = modelId.slice(0, idx);
+    const m = modelId.slice(idx + 1);
+    const ep = (PROVIDER_ENDPOINT as Record<string, string>)[prov];
+    if (ep) return { endpoint: ep, upstream: m, provider: prov };
+  }
+  for (const [prov, list] of Object.entries(PROVIDER_MODELS)) {
+    if ((list as string[]).includes(modelId)) {
+      return { endpoint: (PROVIDER_ENDPOINT as Record<string, string>)[prov], upstream: modelId, provider: prov };
+    }
+  }
+  return null;
+}
 
 function jsonResp(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-}
-
-function endpointFor(p: Provider): string {
-  switch (p) {
-    case "xprivo": return XPRIVO_URL;
-    case "lovable": return LOVABLE_URL;
-    case "g4f-groq": return G4F_GROQ;
-    case "g4f-nvidia": return G4F_NVIDIA;
-    case "g4f-gpt4free": return G4F_GPT4FREE;
-    case "g4f-pollinations": return G4F_POLLI;
-    case "g4f-gemini": return G4F_GEMINI;
-    case "g4f-perplexity": return G4F_PERPLEX;
-    case "g4f-azure": return G4F_AZURE;
-    case "pollinations-text": return POLLI_TEXT;
-    default: return "";
-  }
 }
 
 // Accepts a model+messages+options, returns upstream Response.
@@ -87,33 +48,10 @@ export async function callUpstream(opts: {
   max_tokens?: number;
   response_format?: any;
 }): Promise<Response> {
-  const cfg = MODEL_MAP[opts.modelId];
+  const cfg = resolveModel(opts.modelId);
   if (!cfg) throw new Error(`Unknown model: ${opts.modelId}`);
 
-  // Pollinations image: GET URL → return as JSON image
-  if (cfg.provider === "pollinations-image") {
-    const lastUser = [...opts.messages].reverse().find(m => m.role === "user");
-    const prompt = typeof lastUser?.content === "string" ? lastUser.content : JSON.stringify(lastUser?.content || "");
-    const url = `${POLLI_IMAGE}/${encodeURIComponent(prompt)}?model=${cfg.upstream}&nologo=true&safe=false`;
-    return new Response(JSON.stringify({
-      id: `img-${Date.now()}`,
-      object: "chat.completion",
-      created: Math.floor(Date.now() / 1000),
-      model: opts.modelId,
-      choices: [{
-        index: 0,
-        message: {
-          role: "assistant",
-          content: `![image](${url})`,
-          images: [{ image_url: { url } }],
-        },
-        finish_reason: "stop",
-      }],
-      usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
-    }), { headers: { "Content-Type": "application/json" } });
-  }
-
-  const url = endpointFor(cfg.provider);
+  const url = cfg.endpoint;
   const headers: Record<string, string> = { "Content-Type": "application/json" };
 
   if (cfg.provider === "xprivo") {
@@ -142,7 +80,7 @@ export async function callUpstream(opts: {
   return await fetch(url, { method: "POST", headers, body: JSON.stringify(body) });
 }
 
-export { MODEL_MAP, corsHeaders, jsonResp };
+export { corsHeaders, jsonResp };
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -159,7 +97,7 @@ Deno.serve(async (req) => {
     messageLength = JSON.stringify(messages || []).length;
 
     const modelId = model || "xprivo";
-    if (!MODEL_MAP[modelId]) return jsonResp({ error: `Unknown model: ${modelId}` }, 400);
+    if (!resolveModel(modelId)) return jsonResp({ error: `Unknown model: ${modelId}` }, 400);
 
     // Track key (non-blocking)
     if (apiKey) {
@@ -188,7 +126,8 @@ Deno.serve(async (req) => {
     }
 
     // xPrivo PRO-fallback
-    if (MODEL_MAP[modelId].provider === "xprivo" && upstream.body) {
+    const _cfg = resolveModel(modelId)!;
+    if (_cfg.provider === "xprivo" && upstream.body) {
       const reader = upstream.body.getReader();
       const { value: firstChunk, done } = await reader.read();
       const firstText = firstChunk ? new TextDecoder().decode(firstChunk) : "";
