@@ -10,12 +10,20 @@ const corsHeaders = {
 };
 
 const XPRIVO_URL   = "https://www.xprivo.com/v1/chat/completions";
+const LOVABLE_URL  = "https://ai.gateway.lovable.dev/v1/chat/completions";
 
 const XPRIVO_MODELS = new Set(["xprivo", "mistral-3"]);
 
 function resolveModel(modelId: string): { endpoint: string; upstream: string; provider: string } | null {
   if (XPRIVO_MODELS.has(modelId)) return { endpoint: XPRIVO_URL, upstream: modelId, provider: "xprivo" };
+  if (modelId === "vision") return { endpoint: LOVABLE_URL, upstream: "google/gemini-2.5-flash", provider: "lovable" };
   return null;
+}
+
+function hasVisionContent(messages: any[]): boolean {
+  return (messages || []).some((m: any) =>
+    Array.isArray(m?.content) && m.content.some((p: any) => p?.type === "image_url" || p?.type === "input_image")
+  );
 }
 
 const PUBLIC_MODELS = [...XPRIVO_MODELS].map((id) => ({
@@ -64,7 +72,8 @@ Deno.serve(async (req) => {
     }
 
     const modelId = model || "xprivo";
-    const cfg = resolveModel(modelId);
+    const effectiveModel = hasVisionContent(messages) ? "vision" : modelId;
+    const cfg = resolveModel(effectiveModel);
     if (!cfg) {
       return jsonResp({ error: { message: `Unknown model: ${modelId}`, type: "invalid_request_error" } }, 400);
     }
@@ -78,6 +87,12 @@ Deno.serve(async (req) => {
       headers["x-api-version"] = "2";
       headers["x-lang-chat"] = "en";
       headers["x-use-web"] = web ? "on" : "off";
+    } else if (cfg.provider === "lovable") {
+      const LK = Deno.env.get("LOVABLE_API_KEY");
+      if (!LK) {
+        return jsonResp({ error: { message: "Vision provider not configured", type: "internal_error" } }, 500);
+      }
+      headers["Authorization"] = `Bearer ${LK}`;
     }
 
     const upstreamBody: Record<string, unknown> = {
