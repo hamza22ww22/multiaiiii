@@ -216,6 +216,23 @@ const r = await openai.chat.completions.create({
 });
 console.log(r.choices[0].message.tool_calls);`;
 
+  const visionExample = `// Vision / image input — attach an image with any model.
+// Requests containing images are auto-routed to a vision-capable model.
+const r = await openai.chat.completions.create({
+  model: "${selectedModel}",
+  messages: [{
+    role: "user",
+    content: [
+      { type: "text", text: "What is in this image?" },
+      { type: "image_url", image_url: {
+          url: "https://example.com/photo.jpg"
+          // or a data URL: "data:image/jpeg;base64,/9j/4AAQ..."
+      }},
+    ],
+  }],
+});
+console.log(r.choices[0].message.content);`;
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       <header className="flex items-center justify-between border-b border-white/10 px-4 py-3 sm:px-6">
