@@ -78,9 +78,19 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { messages, model, web, tools, tool_choice, temperature, max_tokens, response_format } = body;
+    const { messages, model, web, image, tools, tool_choice, temperature, max_tokens, response_format } = body;
     const apiKey = req.headers.get("x-api-key") || body.apiKey;
     messageLength = JSON.stringify(messages || []).length;
+
+    // Image generation mode — free via Pollinations (no key required).
+    if (image) {
+      const lastUser = [...(messages || [])].reverse().find((m: any) => m.role === "user");
+      const prompt = (typeof lastUser?.content === "string" ? lastUser.content : "").trim();
+      if (!prompt) return jsonResp({ error: "Prompt required for image generation" }, 400);
+      const seed = Math.floor(Math.random() * 1e9);
+      const url = `${POLLI_IMAGE}/${encodeURIComponent(prompt)}?width=1024&height=1024&nologo=true&seed=${seed}`;
+      return jsonResp({ image: url, text: `Generated image for: ${prompt}` });
+    }
 
     const modelId = model || "xprivo";
     if (!resolveModel(modelId)) return jsonResp({ error: `Unknown model: ${modelId}` }, 400);
