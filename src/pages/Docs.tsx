@@ -418,6 +418,7 @@ console.log(r.choices[0].message.content);`;
               <TabsTrigger value="js">JS/TS (OpenAI SDK)</TabsTrigger>
               <TabsTrigger value="py">Python (OpenAI SDK)</TabsTrigger>
               <TabsTrigger value="tools">Tool Calling</TabsTrigger>
+              <TabsTrigger value="vision">Vision (Images)</TabsTrigger>
             </TabsList>
             <TabsContent value="curl">
               <CodeBlock code={curlExample} onCopy={() => copy(curlExample)} />
@@ -430,6 +431,13 @@ console.log(r.choices[0].message.content);`;
             </TabsContent>
             <TabsContent value="tools">
               <CodeBlock code={toolsExample} onCopy={() => copy(toolsExample)} />
+            </TabsContent>
+            <TabsContent value="vision">
+              <p className="mb-2 text-xs text-muted-foreground">
+                Send an <code>image_url</code> part in the message content. Works with HTTPS URLs or base64 data URLs.
+                Image input is automatically routed to a vision-capable model — Mistral / xPrivo text models cannot read images directly.
+              </p>
+              <CodeBlock code={visionExample} onCopy={() => copy(visionExample)} />
             </TabsContent>
           </Tabs>
         </Card>
