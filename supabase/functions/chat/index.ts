@@ -13,8 +13,15 @@ const XPRIVO_MODELS = new Set(["xprivo", "mistral-3"]);
 
 function resolveModel(modelId: string): { endpoint: string; upstream: string; provider: string } | null {
   if (XPRIVO_MODELS.has(modelId)) return { endpoint: XPRIVO_URL, upstream: modelId, provider: "xprivo" };
-  if (modelId === "lovable") return { endpoint: LOVABLE_URL, upstream: "google/gemini-2.5-flash", provider: "lovable" };
+  if (modelId === "lovable" || modelId === "vision") return { endpoint: LOVABLE_URL, upstream: "google/gemini-2.5-flash", provider: "lovable" };
   return null;
+}
+
+// Detect if any message contains an image (OpenAI multimodal content array)
+function hasVisionContent(messages: any[]): boolean {
+  return (messages || []).some((m: any) =>
+    Array.isArray(m?.content) && m.content.some((p: any) => p?.type === "image_url" || p?.type === "input_image")
+  );
 }
 
 function jsonResp(body: unknown, status = 200) {
@@ -95,6 +102,10 @@ Deno.serve(async (req) => {
     const modelId = model || "xprivo";
     if (!resolveModel(modelId)) return jsonResp({ error: `Unknown model: ${modelId}` }, 400);
 
+    // Auto-route to vision-capable model when images are attached
+    // (xPrivo/mistral-3 do not support image input; Lovable Gemini does).
+    const effectiveModel = hasVisionContent(messages) ? "vision" : modelId;
+
     // Track key (non-blocking)
     if (apiKey) {
       const supa = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
@@ -103,11 +114,11 @@ Deno.serve(async (req) => {
         .catch(() => {});
     }
 
-    const sys = { role: "system", content: "You are a fast, helpful AI assistant. Be concise. Use markdown when useful. When tools are provided, USE them to perform actions — do not just describe what you would do." };
+    const sys = { role: "system", content: "You are a fast, helpful AI assistant. Be concise. Use markdown when useful. When images are provided, analyze them carefully. When tools are provided, USE them to perform actions — do not just describe what you would do." };
     const finalMessages = (messages || []).some((m: any) => m.role === "system") ? messages : [sys, ...messages];
 
     const upstream = await callUpstream({
-      modelId, messages: finalMessages, stream: true,
+      modelId: effectiveModel, messages: finalMessages, stream: true,
       web, tools, tool_choice, temperature, max_tokens, response_format,
     });
 
@@ -122,7 +133,7 @@ Deno.serve(async (req) => {
     }
 
     // xPrivo PRO-fallback
-    const _cfg = resolveModel(modelId)!;
+    const _cfg = resolveModel(effectiveModel)!;
     if (_cfg.provider === "xprivo" && upstream.body) {
       const reader = upstream.body.getReader();
       const { value: firstChunk, done } = await reader.read();

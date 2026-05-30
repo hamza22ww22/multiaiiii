@@ -6,11 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Loader2, Send, Globe, Image as ImageIcon, Code2, Terminal } from "lucide-react";
+import { Loader2, Send, Globe, Image as ImageIcon, Code2, Terminal, Paperclip, X } from "lucide-react";
 import { toast } from "sonner";
 import AgentPanel from "@/components/AgentPanel";
 import chatBg from "@/assets/chat-bg.png";
-type Msg = { role: "user" | "assistant"; content: string; image?: string };
+type Msg = { role: "user" | "assistant"; content: string; image?: string; attachedImage?: string };
 const FUNCTIONS_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
 
 // Only verified working models.
@@ -42,6 +42,8 @@ const Index = () => {
   const [web, setWeb] = useState(false);
   const [imageMode, setImageMode] = useState(false);
   const [agentMode, setAgentMode] = useState(false);
+  const [attachedImage, setAttachedImage] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -63,16 +65,33 @@ const Index = () => {
 
   const send = async () => {
     const text = input.trim();
-    if (!text || loading) return;
-    const next: Msg[] = [...messages, { role: "user", content: text }];
+    if ((!text && !attachedImage) || loading) return;
+    const img = attachedImage;
+    const userMsg: Msg = { role: "user", content: text, attachedImage: img || undefined };
+    const next: Msg[] = [...messages, userMsg];
     setMessages(next);
     setInput("");
+    setAttachedImage(null);
     setLoading(true);
+
+    // Build payload messages: convert to multimodal content array if image attached
+    const payloadMessages = next.map((m) => {
+      if (m.role === "user" && m.attachedImage) {
+        return {
+          role: "user",
+          content: [
+            { type: "text", text: m.content || "What is in this image?" },
+            { type: "image_url", image_url: { url: m.attachedImage } },
+          ],
+        };
+      }
+      return { role: m.role, content: m.content };
+    });
     try {
       const res = await fetch(FUNCTIONS_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: next, model, web, image: imageMode }),
+        body: JSON.stringify({ messages: payloadMessages, model, web, image: imageMode }),
       });
 
       const ct = res.headers.get("content-type") || "";
@@ -129,6 +148,17 @@ const Index = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const onPickFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    e.target.value = "";
+    if (!f) return;
+    if (!f.type.startsWith("image/")) { toast.error("Please select an image file"); return; }
+    if (f.size > 5 * 1024 * 1024) { toast.error("Image must be under 5MB"); return; }
+    const reader = new FileReader();
+    reader.onload = () => setAttachedImage(reader.result as string);
+    reader.readAsDataURL(f);
   };
 
   return (
@@ -189,6 +219,7 @@ const Index = () => {
               m.role === "user" ? "bg-foreground text-background shadow-lg" : "border border-white/10 bg-white/[0.04] backdrop-blur-sm"
             }`}>
               {m.image && <img src={m.image} alt="generated" className="mb-2 max-w-full rounded-lg" />}
+              {m.attachedImage && <img src={m.attachedImage} alt="attached" className="mb-2 max-h-64 rounded-lg" />}
               {m.role === "assistant" ? (
                 <div className="prose prose-sm prose-invert max-w-none break-words">
                   {m.content
@@ -223,8 +254,32 @@ const Index = () => {
               <span>Image mode</span>
               <Switch checked={imageMode} onCheckedChange={setImageMode} />
             </label>
+            <span className="opacity-60">Attach an image to ask questions about it (vision)</span>
           </div>
+          {attachedImage && (
+            <div className="relative inline-block">
+              <img src={attachedImage} alt="preview" className="max-h-32 rounded-lg border border-white/10" />
+              <button
+                onClick={() => setAttachedImage(null)}
+                className="absolute -top-2 -right-2 rounded-full bg-background p-1 shadow border border-white/10"
+                title="Remove"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </div>
+          )}
           <div className="flex gap-2">
+            <input ref={fileRef} type="file" accept="image/*" onChange={onPickFile} className="hidden" />
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-12 w-12 shrink-0"
+              onClick={() => fileRef.current?.click()}
+              disabled={loading}
+              title="Attach image (vision)"
+            >
+              <Paperclip className="h-4 w-4" />
+            </Button>
             <Textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
@@ -238,7 +293,7 @@ const Index = () => {
               className="min-h-[48px] resize-none"
               disabled={loading}
             />
-            <Button onClick={send} disabled={loading || !input.trim()} size="icon" className="h-12 w-12 shrink-0">
+            <Button onClick={send} disabled={loading || (!input.trim() && !attachedImage)} size="icon" className="h-12 w-12 shrink-0">
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
             </Button>
           </div>
