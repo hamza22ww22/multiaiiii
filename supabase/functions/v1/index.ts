@@ -2,7 +2,6 @@
 // POST /functions/v1/v1/chat/completions
 // GET  /functions/v1/v1/models
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-import { PROVIDER_MODELS, PROVIDER_ENDPOINT } from "./_catalog.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -12,36 +11,16 @@ const corsHeaders = {
 
 const XPRIVO_URL   = "https://www.xprivo.com/v1/chat/completions";
 
-// Legacy xPrivo-hosted models (kept for backward compatibility)
-const XPRIVO_MODELS = new Set(["xprivo", "qwen-latest", "mistral-3"]);
+const XPRIVO_MODELS = new Set(["xprivo", "mistral-3"]);
 
-// Resolve a model id to { endpoint, upstreamModel, provider }.
-// Format: "<provider>:<model>" — e.g. "groq:llama-3.3-70b-versatile".
-// Bare ids are looked up across all providers (first match wins) for compat.
 function resolveModel(modelId: string): { endpoint: string; upstream: string; provider: string } | null {
   if (XPRIVO_MODELS.has(modelId)) return { endpoint: XPRIVO_URL, upstream: modelId, provider: "xprivo" };
-  const idx = modelId.indexOf(":");
-  if (idx > 0) {
-    const prov = modelId.slice(0, idx);
-    const m = modelId.slice(idx + 1);
-    const ep = (PROVIDER_ENDPOINT as Record<string, string>)[prov];
-    if (ep) return { endpoint: ep, upstream: m, provider: prov };
-  }
-  // bare lookup
-  for (const [prov, list] of Object.entries(PROVIDER_MODELS)) {
-    if ((list as string[]).includes(modelId)) {
-      return { endpoint: (PROVIDER_ENDPOINT as Record<string, string>)[prov], upstream: modelId, provider: prov };
-    }
-  }
   return null;
 }
 
-const PUBLIC_MODELS = [
-  ...[...XPRIVO_MODELS].map((id) => ({ id, object: "model", created: 1700000000, owned_by: "xprivo" })),
-  ...Object.entries(PROVIDER_MODELS).flatMap(([prov, list]) =>
-    (list as string[]).map((m) => ({ id: `${prov}:${m}`, object: "model", created: 1700000000, owned_by: prov }))
-  ),
-];
+const PUBLIC_MODELS = [...XPRIVO_MODELS].map((id) => ({
+  id, object: "model", created: 1700000000, owned_by: "xprivo",
+}));
 
 function jsonResp(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });

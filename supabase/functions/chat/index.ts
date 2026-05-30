@@ -1,6 +1,4 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-import { PROVIDER_MODELS, PROVIDER_ENDPOINT } from "./_catalog.ts";
-
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-api-key",
@@ -11,23 +9,11 @@ const XPRIVO_URL   = "https://www.xprivo.com/v1/chat/completions";
 const LOVABLE_URL  = "https://ai.gateway.lovable.dev/v1/chat/completions";
 const POLLI_IMAGE  = "https://image.pollinations.ai/prompt";
 
-const XPRIVO_MODELS = new Set(["xprivo", "qwen-latest", "mistral-3"]);
+const XPRIVO_MODELS = new Set(["xprivo", "mistral-3"]);
 
 function resolveModel(modelId: string): { endpoint: string; upstream: string; provider: string } | null {
   if (XPRIVO_MODELS.has(modelId)) return { endpoint: XPRIVO_URL, upstream: modelId, provider: "xprivo" };
   if (modelId === "lovable") return { endpoint: LOVABLE_URL, upstream: "google/gemini-2.5-flash", provider: "lovable" };
-  const idx = modelId.indexOf(":");
-  if (idx > 0) {
-    const prov = modelId.slice(0, idx);
-    const m = modelId.slice(idx + 1);
-    const ep = (PROVIDER_ENDPOINT as Record<string, string>)[prov];
-    if (ep) return { endpoint: ep, upstream: m, provider: prov };
-  }
-  for (const [prov, list] of Object.entries(PROVIDER_MODELS)) {
-    if ((list as string[]).includes(modelId)) {
-      return { endpoint: (PROVIDER_ENDPOINT as Record<string, string>)[prov], upstream: modelId, provider: prov };
-    }
-  }
   return null;
 }
 

@@ -10,23 +10,13 @@ import { Loader2, Send, Globe, Image as ImageIcon, Code2, Terminal } from "lucid
 import { toast } from "sonner";
 import AgentPanel from "@/components/AgentPanel";
 import chatBg from "@/assets/chat-bg.png";
-import { PROVIDER_MODELS } from "@/lib/g4f-catalog";
-
 type Msg = { role: "user" | "assistant"; content: string; image?: string };
 const FUNCTIONS_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
 
-// Built from the g4f.dev catalog: every provider + every model.
-// IDs use "<provider>:<model>" format for unambiguous routing.
-const MODEL_GROUPS: { provider: string; models: { id: string; label: string }[] }[] = [
-  { provider: "xPrivo", models: [
-    { id: "xprivo", label: "xPrivo" },
-    { id: "qwen-latest", label: "Qwen 3 (Reasoning)" },
-    { id: "mistral-3", label: "Mistral 3" },
-  ]},
-  ...Object.entries(PROVIDER_MODELS).map(([prov, list]) => ({
-    provider: prov,
-    models: list.map((m) => ({ id: `${prov}:${m}`, label: m })),
-  })),
+// Only verified working models.
+const MODELS = [
+  { id: "xprivo",    label: "xPrivo" },
+  { id: "mistral-3", label: "Mistral 3" },
 ];
 
 const STORAGE_KEY = "xprivo.chat.history.v1";
@@ -171,17 +161,8 @@ const Index = () => {
           <Select value={model} onValueChange={setModel}>
             <SelectTrigger className="w-[240px]"><SelectValue /></SelectTrigger>
             <SelectContent className="max-h-[480px]">
-              {MODEL_GROUPS.map((g) => (
-                <div key={g.provider}>
-                  <div className="sticky top-0 z-10 bg-popover px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                    {g.provider} · {g.models.length}
-                  </div>
-                  {g.models.map((m) => (
-                    <SelectItem key={m.id} value={m.id}>
-                      <span className="truncate">{m.label}</span>
-                    </SelectItem>
-                  ))}
-                </div>
+              {MODELS.map((m) => (
+                <SelectItem key={m.id} value={m.id}>{m.label}</SelectItem>
               ))}
             </SelectContent>
           </Select>
